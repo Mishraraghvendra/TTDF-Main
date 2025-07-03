@@ -50,11 +50,10 @@ class ServiceFormAdmin(admin.ModelAdmin):
 
 @admin.register(ScreeningCommittee)
 class ScreeningCommitteeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'service', 'committee_type', 'head', 'sub_head', 'is_active', 'created_at')
-    list_filter = ('committee_type', 'is_active', 'service')
-    search_fields = ('name', 'service__name', 'description')
-    readonly_fields = ('created_at', 'updated_at')
-
+    list_display = ("name", "committee_type", "is_created", "is_active", "created_at")
+    list_filter = ("committee_type", "is_active", "is_created")
+    search_fields = ("name", "description")
+    
 
 @admin.register(CommitteeMember)
 class CommitteeMemberAdmin(admin.ModelAdmin):

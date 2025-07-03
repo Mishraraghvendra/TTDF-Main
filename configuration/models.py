@@ -4,7 +4,8 @@ from django.conf import settings
 import uuid
 from dynamic_form.models import FormSubmission
 from django.utils import timezone
-
+from django.db.models.signals import pre_save
+from django.dispatch import receiver
 
 class ConfigurationProfile(models.Model):
     
@@ -163,7 +164,9 @@ class ServiceForm(models.Model):
         return f"Form for {self.service.name}"
 
 
-class ScreeningCommittee(models.Model):
+
+
+class ScreeningCommittee(models.Model): 
     """
     Committees that perform administrative or technical screening.
     """
@@ -172,38 +175,25 @@ class ScreeningCommittee(models.Model):
         ('technical',     'Technical Screening'),
     )
 
-    id             = models.UUIDField(
-                       primary_key=True,
-                       default=uuid.uuid4,
-                       editable=False
-                    )
-    service        = models.ForeignKey(
-                       Service,
-                       on_delete=models.CASCADE,
-                       related_name='screening_committees'
-                    )
+    id             = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    service        = models.ForeignKey(Service, on_delete=models.CASCADE, related_name='screening_committees')
     name           = models.CharField(max_length=255)
     committee_type = models.CharField(max_length=20, choices=COMMITTEE_TYPES)
     description    = models.TextField(blank=True, null=True)
     head           = models.ForeignKey(
-                       settings.AUTH_USER_MODEL,
-                       on_delete=models.SET_NULL,
-                       null=True,
-                       related_name='headed_committees'
+                       settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+                       null=True, related_name='headed_committees'
                     )
     sub_head       = models.ForeignKey(
-                       settings.AUTH_USER_MODEL,
-                       on_delete=models.SET_NULL,
-                       null=True,
-                       related_name='sub_headed_committees'
+                       settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+                       null=True, blank= True ,related_name='sub_headed_committees'
                     )
     is_active      = models.BooleanField(default=True)
     created_by     = models.ForeignKey(
-                       settings.AUTH_USER_MODEL,
-                       on_delete=models.SET_NULL,
-                       null=True,
-                       related_name='created_committees'
+                       settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+                       null=True, related_name='created_committees'
                     )
+    is_created     = models.BooleanField(default=False, editable=False)  # <-- NEW FIELD
     created_at     = models.DateTimeField(auto_now_add=True)
     updated_at     = models.DateTimeField(auto_now=True)
 
@@ -212,6 +202,20 @@ class ScreeningCommittee(models.Model):
 
     def __str__(self):
         return f"{self.service.name} - {self.get_committee_type_display()}"
+    
+
+@receiver(pre_save, sender=ScreeningCommittee)
+def set_is_created_flag(sender, instance, **kwargs):
+        if instance._state.adding and not instance.is_created:
+            instance.is_created = True
+
+
+
+
+
+
+
+
 
 
 class CommitteeMember(models.Model):

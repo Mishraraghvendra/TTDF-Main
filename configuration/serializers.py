@@ -356,28 +356,41 @@ class CommitteeMemberSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
+
+
+
+
+from rest_framework import serializers
+from .models import ScreeningCommittee
+# from .serializers import UserBasicSerializer  # Assuming this is already defined
+
 class ScreeningCommitteeSerializer(serializers.ModelSerializer):
     members_count = serializers.SerializerMethodField()
     head_details = UserBasicSerializer(source='head', read_only=True)
     sub_head_details = UserBasicSerializer(source='sub_head', read_only=True)
-    
+
     class Meta:
         model = ScreeningCommittee
         fields = [
-            'id', 'service', 'name', 'committee_type', 'description', 
-            'head', 'head_details', 'sub_head', 'sub_head_details', 
-            'is_active', 'created_at', 'members_count'
+            'id', 'service', 'name', 'committee_type', 'description',
+            'head', 'head_details', 'sub_head', 'sub_head_details',
+            'is_active', 'created_at', 'members_count', 'is_created'
         ]
-        read_only_fields = ['created_at']
-    
+        read_only_fields = ['created_at', 'is_created']
+
     def get_members_count(self, obj):
         return obj.members.filter(is_active=True).count()
-    
+
     def create(self, validated_data):
         request = self.context.get('request')
         if request and hasattr(request, 'user'):
             validated_data['created_by'] = request.user
         return super().create(validated_data)
+
+
+
+
+
 
 
 class ScreeningResultSerializer(serializers.ModelSerializer):
