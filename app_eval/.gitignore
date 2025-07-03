@@ -1,0 +1,18 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.env
+db.sqlite3
+
+# React
+node_modules/
+build/
+frontend/node_modules/
+frontend/.env
+
+# General
+.vscode/
+*.log
+*.zip

@@ -1,0 +1,222 @@
+Submitting call data: {
+  "title": "8G Call",
+  "description": "this is a test discription",
+  "startDate": "2025-07-03",
+  "endDate": "2025-07-30",
+  "status": "draft",
+  "image": "9.jpg",
+  "pdfFile": "App-Flow_updated.pdf",
+  "hasAdminScreening": true,
+  "hasTechScreening": true,
+  "screeningSequence": "admin-first",
+  "selectedForm": "Standard Research Form",
+  "selectedCriteria": [
+    {
+      "id": 10,
+      "name": "Novelty - 10% (Indicative weightage in %)",
+      "description": "Evaluate the project plan, including timelines, milestones, and deliverables. Evaluate the potential for the commercialization of the proposed testing infrastructure developed by the lab.",
+      "maxMarks": 10,
+      "weight": 10
+    },
+    {
+      "id": 8,
+      "name": "Cost and Budget (Commercialization Strategy) (Cost Estimation & budget management ) - 15% (Indicative weightage in %)",
+      "description": "Evaluate the comprehensiveness of the lab's standardization and testing capabilities across a range of quantum communication technologies.",
+      "maxMarks": 10,
+      "weight": 15
+    },
+    {
+      "id": 9,
+      "name": "Cost and Budget (Commercialization Strategy) (Import substitution) - 5% (Indicative weightage in %)",
+      "description": "Does the lab provide a holistic approach to standardization and testing?",
+      "maxMarks": 10,
+      "weight": 5
+    },
+    {
+      "id": 20,
+      "name": "Significance and Impact: Research should address significant challenges and have a meaningful impact on the field or society,  to acknowledge its potential to generate transformative innovations and create positive change.",
+      "description": "",
+      "maxMarks": 10,
+      "weight": 25
+    },
+    {
+      "id": 19,
+      "name": "Scalability and Future-proofing: Research outcomes should be scalable and adaptable to future changes or advancements, to emphasize the importance of long-term viability and sustainability.",
+      "description": "",
+      "maxMarks": 10,
+      "weight": 10
+    },
+    {
+      "id": 18,
+      "name": "Market Demand and Use Cases: Research that aligns with market needs and addresses practical use cases is more likely to have a real-world impact, to reflect its importance in ensuring relevance and applicability.",
+      "description": "",
+      "maxMarks": 10,
+      "weight": 10
+    },
+    {
+      "id": 17,
+      "name": "Long-Term Vision and Sustainability: A clear long-term vision and commitment to sustainability are essential for ensuring the lasting impact of research outcomes, to highlight its role in guiding strategic decision-making and resource allocation.",
+      "description": "",
+      "maxMarks": 10,
+      "weight": 10
+    },
+    {
+      "id": 16,
+      "name": "Innovation Potential: Innovation is crucial for driving progress and addressing challenges in research, to emphasize the significance of introducing novel ideas, methodologies, or technologies.",
+      "description": "",
+      "maxMarks": 10,
+      "weight": 7.5
+    },
+    {
+      "id": 15,
+      "name": "Ecosystem Readiness: The readiness of the broader ecosystem, including technological infrastructure can significantly influence the success of a research project, to acknowledge its role in facilitating or hindering research implementation.",
+      "description": "",
+      "maxMarks": 10,
+      "weight": 7.5
+    }
+  ],
+  "cutoffMarks": {
+    "fullEvaluation": "70"
+  },
+  "presentationDetails": {
+    "required": false,
+    "format": "",
+    "duration": "",
+    "evaluationCriteria": "",
+    "schedule": [],
+    "maxMarks": 0,
+    "minPassPercentage": 0,
+    "finalPassPercentage": 0,
+    "presentationDetails.required": true,
+    "presentationDetails.maxMarks": 100,
+    "presentationDetails.minPassPercentage": 65,
+    "presentationDetails.finalPassPercentage": 75
+  },
+  "evaluators": {
+    "sameForBoth": true,
+    "technical": [
+      {
+        "id": "1",
+        "name": "Suresh",
+        "email": "suresh@ey.com",
+        "expertise": "",
+        "phase": "both"
+      },
+      {
+        "id": "2",
+        "name": "Manish",
+        "email": "manish@ey.com",
+        "expertise": "",
+        "phase": "both"
+      },
+      {
+        "id": "3",
+        "name": "Mohan",
+        "email": "mohan@ey.com",
+        "expertise": "",
+        "phase": "both"
+      },
+      {
+        "id": "5",
+        "name": "Rohan",
+        "email": "rohan@ey.com",
+        "expertise": "",
+        "phase": "both"
+      },
+      {
+        "id": "7",
+        "name": "Vijay",
+        "email": "vijay@ey.com",
+        "expertise": "",
+        "phase": "both"
+      }
+    ],
+    "presentation": [
+      {
+        "id": "1",
+        "name": "Suresh",
+        "email": "suresh@ey.com",
+        "expertise": "",
+        "phase": "both"
+      },
+      {
+        "id": "2",
+        "name": "Manish",
+        "email": "manish@ey.com",
+        "expertise": "",
+        "phase": "both"
+      },
+      {
+        "id": "3",
+        "name": "Mohan",
+        "email": "mohan@ey.com",
+        "expertise": "",
+        "phase": "both"
+      },
+      {
+        "id": "5",
+        "name": "Rohan",
+        "email": "rohan@ey.com",
+        "expertise": "",
+        "phase": "both"
+      },
+      {
+        "id": "7",
+        "name": "Vijay",
+        "email": "vijay@ey.com",
+        "expertise": "",
+        "phase": "both"
+      }
+    ],
+    "skipped": false
+  },
+  "adminCommittees": [
+    {
+      "id": "5d558e10-daba-4f25-9a8b-c2ad9588f295",
+      "name": "Quantum Administrative",
+      "type": "admin",
+      "members": [
+        {
+          "id": "1409",
+          "name": "ratna.dutta",
+          "email": "ratna.dutta@gmail.com",
+          "isHead": false
+        },
+        {
+          "id": "1410",
+          "name": "ddey",
+          "email": "ddey@iiitl.ac.in",
+          "isHead": false
+        },
+        {
+          "id": "904",
+          "name": "Vinod Kumar",
+          "email": "ddg.sri-dot@gov.in",
+          "isHead": false
+        },
+        {
+          "id": "905",
+          "name": "Kamal Agarwal",
+          "email": "ddgqt.tec-dot@gov.in",
+          "isHead": false
+        },
+        {
+          "id": "1411",
+          "name": "sridhar.cv",
+          "email": "sridhar.cv@tcs.com",
+          "isHead": false
+        },
+        {
+          "id": "907",
+          "name": "Gyanendra Tripathi",
+          "email": "gyanendra.d.tripathi@gmail.com",
+          "isHead": false
+        }
+      ]
+    }
+  ],
+  "techCommittees": [],
+  "adminScreeningStatus": "completed",
+  "techScreeningStatus": "skipped",
+  "scheduleDate": "2025-07-10"
+}
