@@ -1343,11 +1343,13 @@ class ServiceConfigViewSet(viewsets.ModelViewSet):
     serializer_class = ServiceConfigSerializer
     permission_classes = [IsAuthenticated]
 
-    def _get_or_create_passing_requirement(self, data, service=None, user=None):
+    def _get_or_create_passing_requirement(self, data, service=None, user=None, update=False):
         from app_eval.models import PassingRequirement
+
         passing_req_data = data.pop('passing_requirement', None)
         if not passing_req_data:
             return None
+
         req_id = passing_req_data.get('id')
         if req_id:
             req = PassingRequirement.objects.filter(id=req_id).first()
@@ -1360,12 +1362,32 @@ class ServiceConfigViewSet(viewsets.ModelViewSet):
                         setattr(req, f, passing_req_data[f])
                 req.save()
                 return req
+            elif update:
+                # ID provided but not found: do not create a new one on update!
+                return None
+        elif update:
+            # No ID provided, and we're updating: try to use the existing one attached to the service
+            if service and getattr(service, "passing_requirement", None):
+                req = service.passing_requirement
+                for f in [
+                    'requirement_name', 'evaluation_min_passing', 'presentation_min_passing',
+                    'presentation_max_marks', 'final_status_min_passing', 'status'
+                ]:
+                    if f in passing_req_data:
+                        setattr(req, f, passing_req_data[f])
+                req.save()
+                return req
+            # No id and no existing: do not create a new one!
+            return None
         else:
+            # Only create if it's a new service
             if not passing_req_data.get('requirement_name') and service:
                 passing_req_data['requirement_name'] = f"{service.name} Passing Config"
             req = PassingRequirement.objects.create(**passing_req_data)
             return req
         return None
+
+
 
     def _get_committee(self, committee_data, committee_type, service, user):
         """
@@ -1468,22 +1490,21 @@ class ServiceConfigViewSet(viewsets.ModelViewSet):
                 serializer.is_valid(raise_exception=True)
                 service = serializer.save()
 
-                # Assign committees (existing or new)
+                # Committees
                 admin_committee = self._get_committee(admin_committee_data, 'administrative', service, user)
                 tech_committee = self._get_committee(tech_committee_data, 'technical', service, user)
 
-                # PassingRequirement
-                passing_req = self._get_or_create_passing_requirement(request.data, service=service, user=user)
+                # ⬇️ HERE: pass update=True!
+                passing_req = self._get_or_create_passing_requirement(request.data, service=service, user=user, update=True)
                 if passing_req:
                     service.passing_requirement = passing_req
                     service.save(update_fields=['passing_requirement'])
 
-                # Evaluation Items
+                # ... rest is same ...
                 evaluation_items = request.data.get('evaluation_items', [])
                 if evaluation_items:
                     service.evaluation_items.set(evaluation_items)
 
-                # Cutoff marks
                 cutoff_marks = request.data.get('cutoff_marks')
                 if cutoff_marks is not None:
                     EvaluationCutoff.objects.update_or_create(
@@ -1491,7 +1512,6 @@ class ServiceConfigViewSet(viewsets.ModelViewSet):
                         defaults={'cutoff_marks': cutoff_marks, 'created_by': user}
                     )
 
-                # Presentation max marks (if still field on Service)
                 presentation_max_marks = request.data.get('presentation_max_marks')
                 if presentation_max_marks is not None and hasattr(service, 'presentation_max_marks'):
                     setattr(service, 'presentation_max_marks', presentation_max_marks)
@@ -1510,7 +1530,6 @@ class ServiceConfigViewSet(viewsets.ModelViewSet):
                 {"message": f"Failed to update Service: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
 
 
 

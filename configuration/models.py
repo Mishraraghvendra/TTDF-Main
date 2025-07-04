@@ -51,7 +51,7 @@ class Service(models.Model):
         ('active', 'Active'),
         ('stopped', 'Stopped'),
     )
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255,unique=True)
     description = models.TextField(blank=True, null=True)
     is_stopped = models.BooleanField(default=False)  # Only admin sets this!
     start_date = models.DateTimeField(null=True, blank=True)
