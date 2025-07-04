@@ -1322,3 +1322,237 @@ class CriteriaListAPIView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+
+
+
+# Fro Config
+
+# configuration/views.py
+
+from rest_framework import viewsets, status
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from django.db import transaction
+from .models import Service, ScreeningCommittee
+from .serializers import ServiceConfigSerializer
+from app_eval.models import EvaluationCutoff
+from django.core.exceptions import ValidationError
+
+class ServiceConfigViewSet(viewsets.ModelViewSet):
+    queryset = Service.objects.all().prefetch_related('evaluation_items')
+    serializer_class = ServiceConfigSerializer
+    permission_classes = [IsAuthenticated]
+
+    def _get_or_create_passing_requirement(self, data, service=None, user=None):
+        from app_eval.models import PassingRequirement
+        passing_req_data = data.pop('passing_requirement', None)
+        if not passing_req_data:
+            return None
+        req_id = passing_req_data.get('id')
+        if req_id:
+            req = PassingRequirement.objects.filter(id=req_id).first()
+            if req:
+                for f in [
+                    'requirement_name', 'evaluation_min_passing', 'presentation_min_passing',
+                    'presentation_max_marks', 'final_status_min_passing', 'status'
+                ]:
+                    if f in passing_req_data:
+                        setattr(req, f, passing_req_data[f])
+                req.save()
+                return req
+        else:
+            if not passing_req_data.get('requirement_name') and service:
+                passing_req_data['requirement_name'] = f"{service.name} Passing Config"
+            req = PassingRequirement.objects.create(**passing_req_data)
+            return req
+        return None
+
+    def _get_committee(self, committee_data, committee_type, service, user):
+        """
+        Handles both existing (ID) and new (dict) committee assignments.
+        Returns the ScreeningCommittee instance or None.
+        """
+        if not committee_data:
+            return None
+        if isinstance(committee_data, int) or (isinstance(committee_data, str) and committee_data.isdigit()):
+            # Existing committee by ID
+            committee = ScreeningCommittee.objects.filter(id=committee_data, committee_type=committee_type).first()
+            if committee:
+                committee.service = service
+                committee.committee_type = committee_type  # Defensive
+                committee.save()
+            return committee
+        elif isinstance(committee_data, dict):
+            # New committee by data
+            return ScreeningCommittee.objects.create(
+                name=committee_data.get('name'),
+                committee_type=committee_type,
+                created_by=user,
+                service=service
+            )
+        return None
+
+    def create(self, request, *args, **kwargs):
+        data = request.data.copy()
+        user = request.user
+        try:
+            with transaction.atomic():
+                # Prepare for committee assignment
+                admin_committee_data = data.pop('admin_committee', None)
+                tech_committee_data = data.pop('tech_committee', None)
+
+                # Remove property fields that should not be set directly
+                for k in ['is_active', 'is_currently_active']:
+                    data.pop(k, None)
+
+                # Create Service
+                serializer = self.get_serializer(data=data)
+                serializer.is_valid(raise_exception=True)
+                service = serializer.save(created_by=user)
+
+                # Assign committees (existing or new)
+                admin_committee = self._get_committee(admin_committee_data, 'administrative', service, user)
+                tech_committee = self._get_committee(tech_committee_data, 'technical', service, user)
+
+                # PassingRequirement
+                passing_req = self._get_or_create_passing_requirement(request.data, service=service, user=user)
+                if passing_req:
+                    service.passing_requirement = passing_req
+                    service.save(update_fields=['passing_requirement'])
+
+                # Evaluation Items
+                evaluation_items = request.data.get('evaluation_items', [])
+                if evaluation_items:
+                    service.evaluation_items.set(evaluation_items)
+
+                # Cutoff marks
+                cutoff_marks = request.data.get('cutoff_marks')
+                if cutoff_marks is not None:
+                    EvaluationCutoff.objects.update_or_create(
+                        service=service,
+                        defaults={'cutoff_marks': cutoff_marks, 'created_by': user}
+                    )
+
+                # Presentation max marks (if still field on Service)
+                presentation_max_marks = request.data.get('presentation_max_marks')
+                if presentation_max_marks is not None and hasattr(service, 'presentation_max_marks'):
+                    setattr(service, 'presentation_max_marks', presentation_max_marks)
+                    service.save(update_fields=['presentation_max_marks'])
+
+                response_serializer = self.get_serializer(service)
+                return Response(
+                    {
+                        "message": "Service created successfully.",
+                        "service": response_serializer.data
+                    },
+                    status=status.HTTP_201_CREATED
+                )
+        except (ValidationError, Exception) as e:
+            return Response(
+                {"message": f"Failed to create Service: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        data = request.data.copy()
+        user = request.user
+        try:
+            with transaction.atomic():
+                admin_committee_data = data.pop('admin_committee', None)
+                tech_committee_data = data.pop('tech_committee', None)
+                for k in ['is_active', 'is_currently_active']:
+                    data.pop(k, None)
+                serializer = self.get_serializer(instance, data=data, partial=partial)
+                serializer.is_valid(raise_exception=True)
+                service = serializer.save()
+
+                # Assign committees (existing or new)
+                admin_committee = self._get_committee(admin_committee_data, 'administrative', service, user)
+                tech_committee = self._get_committee(tech_committee_data, 'technical', service, user)
+
+                # PassingRequirement
+                passing_req = self._get_or_create_passing_requirement(request.data, service=service, user=user)
+                if passing_req:
+                    service.passing_requirement = passing_req
+                    service.save(update_fields=['passing_requirement'])
+
+                # Evaluation Items
+                evaluation_items = request.data.get('evaluation_items', [])
+                if evaluation_items:
+                    service.evaluation_items.set(evaluation_items)
+
+                # Cutoff marks
+                cutoff_marks = request.data.get('cutoff_marks')
+                if cutoff_marks is not None:
+                    EvaluationCutoff.objects.update_or_create(
+                        service=service,
+                        defaults={'cutoff_marks': cutoff_marks, 'created_by': user}
+                    )
+
+                # Presentation max marks (if still field on Service)
+                presentation_max_marks = request.data.get('presentation_max_marks')
+                if presentation_max_marks is not None and hasattr(service, 'presentation_max_marks'):
+                    setattr(service, 'presentation_max_marks', presentation_max_marks)
+                    service.save(update_fields=['presentation_max_marks'])
+
+                response_serializer = self.get_serializer(service)
+                return Response(
+                    {
+                        "message": "Service updated successfully.",
+                        "service": response_serializer.data
+                    },
+                    status=status.HTTP_200_OK
+                )
+        except (ValidationError, Exception) as e:
+            return Response(
+                {"message": f"Failed to update Service: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+
+
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        try:
+            instance.delete()
+            return Response(
+                {"message": "Service deleted successfully."},
+                status=status.HTTP_204_NO_CONTENT
+            )
+        except Exception as e:
+            return Response(
+                {"message": f"Failed to delete Service: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response(
+            {
+                "message": "Service details retrieved.",
+                "service": serializer.data
+            },
+            status=status.HTTP_200_OK
+        )
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        serializer = self.get_serializer(page, many=True) if page is not None else self.get_serializer(queryset, many=True)
+        data = serializer.data
+        msg = f"Returned {len(data)} services."
+        if page is not None:
+            return self.get_paginated_response({"message": msg, "services": data})
+        return Response(
+            {
+                "message": msg,
+                "services": data
+            },
+            status=status.HTTP_200_OK
+        )
+

@@ -15,18 +15,18 @@ STATUS_CHOICES = [
 class PassingRequirement(models.Model):
     # service = models.ForeignKey(Service,on_delete=models.CASCADE,related_name='passing_requirements')
 
-    requirement_name = models.CharField(max_length=255)
-    evaluation_min_passing = models.DecimalField(max_digits=5, decimal_places=2, default=0)
-    presentation_min_passing = models.DecimalField(max_digits=5, decimal_places=2, default=0)
-    presentation_max_marks = models.PositiveIntegerField(default=0)
-    final_status_min_passing = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    requirement_name = models.CharField(max_length=255,null=True,blank=True)
+    evaluation_min_passing = models.DecimalField(max_digits=5, decimal_places=2, default=0,null=True,blank=True)
+    presentation_min_passing = models.DecimalField(max_digits=5, decimal_places=2, default=0,null=True,blank=True)
+    presentation_max_marks = models.PositiveIntegerField(default=0,null=True,blank=True)
+    final_status_min_passing = models.DecimalField(max_digits=5, decimal_places=2, default=0,null=True,blank=True)
 
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='Active')
 
     # def __str__(self):
     #     return f"{self.requirement_name}  ({self.service.name})"
     def __str__(self):
-        return self.requirement_name
+        return self.requirement_name or f"PassingRequirement-{self.pk}"
 
 
 
@@ -52,12 +52,35 @@ class Evaluator(models.Model):
 #     def __str__(self):
 #         return self.user.get_full_name() or self.user.email    
 
-class EvaluationItem(models.Model):  
+# class EvaluationItem(models.Model):  
+#     TYPE_CHOICES = [
+#         ('criteria', 'Criteria'),
+#         ('question', 'Question')
+#     ]
+
+#     name = models.CharField(max_length=100)
+#     key = models.CharField(max_length=50, unique=True, null=True, blank=True)
+#     total_marks = models.DecimalField(max_digits=5, decimal_places=2, validators=[MinValueValidator(Decimal('0'))])
+#     weightage = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+#     status = models.CharField(max_length=10, choices=[('Active','Active'),('Inactive','Inactive')], default='Active')
+#     description = models.TextField(blank=True, null=True)
+#     memberType = models.CharField(max_length=100)
+#     type = models.CharField(max_length=10, choices=TYPE_CHOICES)
+#     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+#     date_created = models.DateTimeField(auto_now_add=True)
+
+#     def __str__(self):
+#         return f"{self.name} ({self.type})"
+
+
+
+# For Config
+  
+class EvaluationItem(models.Model):
     TYPE_CHOICES = [
         ('criteria', 'Criteria'),
         ('question', 'Question')
     ]
-
     name = models.CharField(max_length=100)
     key = models.CharField(max_length=50, unique=True, null=True, blank=True)
     total_marks = models.DecimalField(max_digits=5, decimal_places=2, validators=[MinValueValidator(Decimal('0'))])
@@ -71,6 +94,8 @@ class EvaluationItem(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.type})"
+
+
 
 
 class EvaluationAssignment(models.Model):
@@ -94,7 +119,6 @@ class EvaluationAssignment(models.Model):
     def __str__(self):
         return f"{self.evaluator} assigned to {self.form_submission}"
     
-
 class CriteriaEvaluation(models.Model):
     assignment = models.ForeignKey(EvaluationAssignment, on_delete=models.CASCADE, related_name='criteria_evaluations')
     criteria = models.ForeignKey(EvaluationItem, on_delete=models.CASCADE, related_name='criteria_evaluations')
@@ -108,8 +132,65 @@ class CriteriaEvaluation(models.Model):
     def __str__(self):
         return f"Evaluation of {self.criteria.name} by {self.assignment.evaluator}"
 
+# class QuestionEvaluation(models.Model):
+#     assignment = models.ForeignKey(EvaluationAssignment, on_delete=models.CASCADE, related_name='question_evaluations')
+#     question = models.ForeignKey(EvaluationItem, on_delete=models.CASCADE, related_name='question_evaluations')
+#     marks_given = models.DecimalField(max_digits=5, decimal_places=2, validators=[MinValueValidator(0)])
+#     comments = models.TextField(blank=True, null=True)
+#     date_evaluated = models.DateTimeField(auto_now=True)
+
+#     class Meta:
+#         unique_together = ('assignment', 'question')
+
+#     def __str__(self):
+#         return f"Evaluation of question by {self.assignment.evaluator}"
+
+# class EvaluationCutoff(models.Model):
+#     # Direct link to FormSubmission instead of Proposal
+#     form_submission = models.OneToOneField(
+#         FormSubmission, 
+#         on_delete=models.CASCADE, 
+#         related_name='eval_cutoff'
+#     )
+#     cutoff_marks = models.DecimalField(
+#         max_digits=5, decimal_places=2,
+#         validators=[MinValueValidator(Decimal('0')), MaxValueValidator(Decimal('100'))]
+#     )
+#     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True)
+#     date_created = models.DateTimeField(auto_now_add=True)
+
+#     def __str__(self):
+#         # Get subject from form_submission if available
+#         subject = getattr(self.form_submission, 'subject', None)
+#         if not subject:
+#             # Try to get it from another field or use ID
+#             subject = getattr(self.form_submission, 'title', f"Form {self.form_submission.form_id}")
+#         return f"Cutoff for {subject}: {self.cutoff_marks}"
+
+
+
+# For Config 
+
+class EvaluationCutoff(models.Model):
+    service = models.OneToOneField(
+        'configuration.Service',
+        on_delete=models.CASCADE,
+        related_name='eval_cutoff'
+    )
+    cutoff_marks = models.DecimalField(
+        max_digits=5, decimal_places=2,
+        validators=[MinValueValidator(Decimal('0')), MaxValueValidator(Decimal('100')),], null=True,blank=True
+    )
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True)
+    date_created = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Cutoff for Service: {self.service.name} ({self.cutoff_marks})"
+
+
+
 class QuestionEvaluation(models.Model):
-    assignment = models.ForeignKey(EvaluationAssignment, on_delete=models.CASCADE, related_name='question_evaluations')
+    assignment = models.ForeignKey('tech_eval.EvaluatorAssignment', on_delete=models.CASCADE, related_name='question_evaluations')
     question = models.ForeignKey(EvaluationItem, on_delete=models.CASCADE, related_name='question_evaluations')
     marks_given = models.DecimalField(max_digits=5, decimal_places=2, validators=[MinValueValidator(0)])
     comments = models.TextField(blank=True, null=True)
@@ -120,26 +201,3 @@ class QuestionEvaluation(models.Model):
 
     def __str__(self):
         return f"Evaluation of question by {self.assignment.evaluator}"
-
-class EvaluationCutoff(models.Model):
-    # Direct link to FormSubmission instead of Proposal
-    form_submission = models.OneToOneField(
-        FormSubmission, 
-        on_delete=models.CASCADE, 
-        related_name='eval_cutoff'
-    )
-    cutoff_marks = models.DecimalField(
-        max_digits=5, decimal_places=2,
-        validators=[MinValueValidator(Decimal('0')), MaxValueValidator(Decimal('100'))]
-    )
-    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True)
-    date_created = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        # Get subject from form_submission if available
-        subject = getattr(self.form_submission, 'subject', None)
-        if not subject:
-            # Try to get it from another field or use ID
-            subject = getattr(self.form_submission, 'title', f"Form {self.form_submission.form_id}")
-        return f"Cutoff for {subject}: {self.cutoff_marks}"
-

@@ -6,6 +6,7 @@ from dynamic_form.models import FormSubmission
 from django.utils import timezone
 from django.db.models.signals import pre_save
 from django.dispatch import receiver
+from app_eval.models import EvaluationItem
 
 class ConfigurationProfile(models.Model):
     
@@ -36,92 +37,59 @@ class ConfigurationProfile(models.Model):
         return f"Config for {self.user.get_full_name() or self.user.email}"
 
 
-# class Service(models.Model):
-   
-#     STATUS_CHOICES = (
-#         ('draft', 'Draft'),
-#         ('active', 'Active'),
-#         ('stopped', 'Stopped'),
-#     )    
-#     name        = models.CharField(max_length=255)
-#     description = models.TextField(blank=True, null=True)
-#     is_active   = models.BooleanField(default=True)  # You can keep for legacy or remove
-#     start_date = models.DateTimeField(null=True, blank=True)
-#     end_date   = models.DateTimeField(null=True, blank=True)
-#     status      = models.CharField(
-#                     max_length=20,
-#                     choices=STATUS_CHOICES,
-#                     default='draft',
-#                     help_text="Draft: not visible to applicants, Active: open for applications."
-#                  )
-#     created_by  = models.ForeignKey(
-#                     settings.AUTH_USER_MODEL,
-#                     on_delete=models.SET_NULL,
-#                     null=True,
-#                     related_name='created_services'
-#                  )
-#     created_at  = models.DateTimeField(auto_now_add=True)
-#     updated_at  = models.DateTimeField(auto_now=True)
-
-#     @property
-#     def is_currently_active(self):
-#         if not self.is_active:
-#             return False
-#         if self.end_date and timezone.now() > self.end_date:
-#             return False
-#         return True
-
-#     def __str__(self):
-#         return self.name
-
-
-def service_document_upload_path(instance, filename):
-    # Customize as needed
-    return f"services/{instance.id}/documents/{filename}"
+# For Config
 
 def service_image_upload_path(instance, filename):
-    return f"services/{instance.id}/images/{filename}"
+    return f"service/images/{instance.name}/{filename}"
 
-class Service(models.Model):
+def service_document_upload_path(instance, filename):
+    return f"service/docs/{instance.name}/{filename}"
+
+class Service(models.Model): 
     STATUS_CHOICES = (
         ('draft', 'Draft'),
         ('active', 'Active'),
         ('stopped', 'Stopped'),
-    )    
-    name        = models.CharField(max_length=255)
+    )
+    name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
-    is_active   = models.BooleanField(default=True)
-    start_date  = models.DateTimeField(null=True, blank=True)
-    end_date    = models.DateTimeField(null=True, blank=True)
-    schedule_date = models.DateTimeField(null=True, blank=True)  # New field
-
-    image      = models.ImageField(
-        upload_to=service_image_upload_path, null=True, blank=True
-    )  # New field
-
-    documents  = models.FileField(
-        upload_to=service_document_upload_path, null=True, blank=True
-    )  # For one document. For multiple, see note below
-
-    status      = models.CharField(
+    is_stopped = models.BooleanField(default=False)  # Only admin sets this!
+    start_date = models.DateTimeField(null=True, blank=True)
+    end_date = models.DateTimeField(null=True, blank=True)
+    schedule_date = models.DateTimeField(null=True, blank=True)
+    image = models.ImageField(upload_to='service_images/', null=True, blank=True)
+    documents = models.FileField(upload_to='service_documents/', null=True, blank=True)
+    status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
-        default='draft',
-        help_text="Draft: not visible to applicants, Active: open for applications."
+        default='draft'
     )
-    created_by  = models.ForeignKey(
+    created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         related_name='created_services'
     )
-    created_at  = models.DateTimeField(auto_now_add=True)
-    updated_at  = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    evaluation_items = models.ManyToManyField(
+        'app_eval.EvaluationItem',
+        related_name='services',
+        blank=True,
+        help_text="Assign evaluation items (criteria/questions) to this service"
+    )
+    passing_requirement = models.ForeignKey(
+        'app_eval.PassingRequirement',
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='services'
+    )
 
     @property
-    def is_currently_active(self):
+    def is_active(self):
+        """Service is active if: not stopped, within date window, and has started."""
         now = timezone.now()
-        if not self.is_active:
+        if self.is_stopped:
             return False
         if self.start_date and now < self.start_date:
             return False
@@ -130,18 +98,22 @@ class Service(models.Model):
         return True
 
     def save(self, *args, **kwargs):
+        # Set status automatically for convenience, but does not affect is_active property logic
         now = timezone.now()
-        # Automatically set is_active based on dates
-        if self.start_date and now < self.start_date:
-            self.is_active = False
+        if self.is_stopped:
+            self.status = 'stopped'
         elif self.end_date and now > self.end_date:
-            self.is_active = False
+            self.status = 'draft'
+        elif self.start_date and now >= self.start_date:
+            self.status = 'active'
         else:
-            self.is_active = True
+            self.status = 'draft'
         super().save(*args, **kwargs)
 
     def __str__(self):
         return self.name
+
+
 
 
 class ServiceForm(models.Model):
@@ -164,93 +136,129 @@ class ServiceForm(models.Model):
         return f"Form for {self.service.name}"
 
 
+# class ScreeningCommittee(models.Model): 
+#     """
+#     Committees that perform administrative or technical screening.
+#     """
+#     COMMITTEE_TYPES = (
+#         ('administrative', 'Administrative Screening'),
+#         ('technical',     'Technical Screening'),
+#     )
 
+#     id             = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+#     service        = models.ForeignKey(Service, on_delete=models.CASCADE, related_name='screening_committees')
+#     name           = models.CharField(max_length=255)
+#     committee_type = models.CharField(max_length=20, choices=COMMITTEE_TYPES)
+#     description    = models.TextField(blank=True, null=True)
+#     head           = models.ForeignKey(
+#                        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+#                        null=True, related_name='headed_committees'
+#                     )
+#     sub_head       = models.ForeignKey(
+#                        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+#                        null=True, blank= True ,related_name='sub_headed_committees'
+#                     )
+#     is_active      = models.BooleanField(default=True)
+#     created_by     = models.ForeignKey(
+#                        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+#                        null=True, related_name='created_committees'
+#                     )
+#     is_created     = models.BooleanField(default=False, editable=False)  # <-- NEW FIELD
+#     created_at     = models.DateTimeField(auto_now_add=True)
+#     updated_at     = models.DateTimeField(auto_now=True)
+
+#     class Meta:
+#         unique_together = ('service', 'committee_type')
+
+#     def __str__(self):
+#         return f"{self.service.name} - {self.get_committee_type_display()}"
+# @receiver(pre_save, sender=ScreeningCommittee)
+# def set_is_created_flag(sender, instance, **kwargs):
+#         if instance._state.adding and not instance.is_created:
+#             instance.is_created = True
+
+
+# For Config
 
 class ScreeningCommittee(models.Model): 
-    """
-    Committees that perform administrative or technical screening.
-    """
     COMMITTEE_TYPES = (
         ('administrative', 'Administrative Screening'),
         ('technical',     'Technical Screening'),
     )
-
-    id             = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    service        = models.ForeignKey(Service, on_delete=models.CASCADE, related_name='screening_committees')
-    name           = models.CharField(max_length=255)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name='screening_committees')
+    name = models.CharField(max_length=255)
     committee_type = models.CharField(max_length=20, choices=COMMITTEE_TYPES)
-    description    = models.TextField(blank=True, null=True)
-    head           = models.ForeignKey(
-                       settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
-                       null=True, related_name='headed_committees'
-                    )
-    sub_head       = models.ForeignKey(
-                       settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
-                       null=True, blank= True ,related_name='sub_headed_committees'
-                    )
-    is_active      = models.BooleanField(default=True)
-    created_by     = models.ForeignKey(
-                       settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
-                       null=True, related_name='created_committees'
-                    )
-    is_created     = models.BooleanField(default=False, editable=False)  # <-- NEW FIELD
-    created_at     = models.DateTimeField(auto_now_add=True)
-    updated_at     = models.DateTimeField(auto_now=True)
+    description = models.TextField(blank=True, null=True)
+    head = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, related_name='headed_committees'
+    )
+    sub_head = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='sub_headed_committees'
+    )
+    is_active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, related_name='created_committees'
+    )
+    is_created = models.BooleanField(default=False, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         unique_together = ('service', 'committee_type')
 
     def __str__(self):
         return f"{self.service.name} - {self.get_committee_type_display()}"
-    
+
+from django.db.models.signals import pre_save
+from django.dispatch import receiver
 
 @receiver(pre_save, sender=ScreeningCommittee)
 def set_is_created_flag(sender, instance, **kwargs):
-        if instance._state.adding and not instance.is_created:
-            instance.is_created = True
+    if instance._state.adding and not instance.is_created:
+        instance.is_created = True
 
 
 
 
 
+# class CommitteeMember(models.Model):
+#     """
+#     Members (users) assigned to a screening committee.
+#     """
+#     id          = models.UUIDField(
+#                        primary_key=True,
+#                        default=uuid.uuid4,
+#                        editable=False
+#                     )
+#     committee   = models.ForeignKey(
+#                        ScreeningCommittee,
+#                        on_delete=models.CASCADE,
+#                        related_name='members'
+#                     )
+#     user        = models.ForeignKey(
+#                        settings.AUTH_USER_MODEL,
+#                        on_delete=models.CASCADE,
+#                        related_name='committee_memberships'
+#                     )
+#     is_active   = models.BooleanField(default=True)
+#     assigned_by = models.ForeignKey(
+#                        settings.AUTH_USER_MODEL,
+#                        on_delete=models.SET_NULL,
+#                        null=True,
+#                        related_name='assigned_members'
+#                     )
+#     assigned_at = models.DateTimeField(auto_now_add=True)
 
+#     class Meta:
+#         unique_together = ('committee', 'user')
 
-
-
-
-class CommitteeMember(models.Model):
-    """
-    Members (users) assigned to a screening committee.
-    """
-    id          = models.UUIDField(
-                       primary_key=True,
-                       default=uuid.uuid4,
-                       editable=False
-                    )
-    committee   = models.ForeignKey(
-                       ScreeningCommittee,
-                       on_delete=models.CASCADE,
-                       related_name='members'
-                    )
-    user        = models.ForeignKey(
-                       settings.AUTH_USER_MODEL,
-                       on_delete=models.CASCADE,
-                       related_name='committee_memberships'
-                    )
-    is_active   = models.BooleanField(default=True)
-    assigned_by = models.ForeignKey(
-                       settings.AUTH_USER_MODEL,
-                       on_delete=models.SET_NULL,
-                       null=True,
-                       related_name='assigned_members'
-                    )
-    assigned_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        unique_together = ('committee', 'user')
-
-    def __str__(self):
-        return f"{self.user.get_full_name() or self.user.email} in {self.committee.name}"
+#     def __str__(self):
+#         return f"{self.user.get_full_name() or self.user.email} in {self.committee.name}"
 
 
 class ScreeningResult(models.Model):
@@ -526,3 +534,49 @@ class CriteriaEvaluatorAssignment(models.Model):
 
     def __str__(self):
         return f"{self.evaluator.get_full_name() or self.evaluator.username} assigned to {self.criteria.name}"
+    
+
+
+# For Config
+
+
+class CommitteeMember(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    committee = models.ForeignKey(
+        ScreeningCommittee, on_delete=models.CASCADE, related_name='members'
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='committee_memberships'
+    )
+    is_active = models.BooleanField(default=True)
+    assigned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='assigned_members'
+    )
+    assigned_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('committee', 'user')
+
+    def __str__(self):
+        return f"{self.user.get_full_name() or self.user.email} in {self.committee.name}"
+
+class ScreeningWorkflowConfig(models.Model):
+    service = models.OneToOneField(Service, on_delete=models.CASCADE, related_name='workflow_config')
+    enabled_stages = models.JSONField(
+        default=list,
+        help_text="Ordered list of enabled stages, e.g. ['admin_screening','technical_screening','technical_evaluation','presentation']"
+    )
+
+    def get_enabled_stages(self):
+        if self.enabled_stages:
+            return self.enabled_stages
+        return [
+            "admin_screening",
+            "technical_screening",
+            "technical_evaluation",
+            "presentation",
+        ]
+
+    def __str__(self):
+        return f"WorkflowConfig for {self.service.name}: {self.enabled_stages}"
+   

@@ -29,12 +29,13 @@ User = get_user_model()
 
 # @method_decorator(cache_page(60 * 60 * 2), name='dispatch')
 class PresentationViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for managing presentation records
-    """
-    queryset = Presentation.objects.all()
-    serializer_class = PresentationSerializer
-    permission_classes = [IsAuthenticated]
+    class PresentationViewSet(viewsets.ModelViewSet):
+        queryset = Presentation.objects.select_related(
+            'proposal__service__passing_requirement',  # for access logic
+            'applicant', 'evaluator', 'admin'
+        )
+        serializer_class = PresentationSerializer
+        permission_classes = [IsAuthenticated]
 
     def _is_admin_user(self, user):
         """Check if user has admin privileges"""
@@ -410,6 +411,76 @@ class PresentationViewSet(viewsets.ModelViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+
+
+class PersonalInterviewViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = UltraFastFormSubmissionSerializer
+    # renderer_classes = [ORJSONRenderer]
+
+    def get_queryset(self):
+        # Annotate the DB with counts/averages for fast access in serializer
+        return (
+            FormSubmission.objects
+            .select_related('applicant', 'service')
+            .prefetch_related(
+                Prefetch(
+                    'presentations',
+                    queryset=Presentation.objects.only(
+                        'id', 'proposal_id', 'final_decision', 'cached_status', 'cached_evaluator_name',
+                        'cached_marks_summary', 'cached_applicant_data',
+                        'video', 'video_link', 'document', 'presentation_date', 'document_uploaded',
+                        'created_at', 'updated_at', 'admin_remarks', 'admin', 'admin_evaluated_at',
+                        'evaluator', 'evaluator_marks', 'evaluator_remarks', 'evaluated_at'
+                    ).order_by('-created_at')
+                ),
+                'milestones',
+                'screening_records'
+            )
+            .only(
+                'proposal_id', 'org_type', 'subject', 'description', 'created_at', 'contact_email',
+                'applicant__organization', 'service__name'
+            )
+            .filter(presentations__isnull=False)
+            .distinct()
+            .annotate(
+                average_marks=Avg('presentations__evaluator_marks'),
+                total_evaluators=Count('presentations__evaluator', distinct=True)
+            )
+        ) 
+    
+
+    def list(self, request, *args, **kwargs):
+        start_total = time.perf_counter()
+        start_qs = time.perf_counter()
+        queryset = self.filter_queryset(self.get_queryset())
+        end_qs = time.perf_counter()
+        logger.warning(f"Queryset time: {end_qs - start_qs:.3f}s")
+
+        start_ser = time.perf_counter()
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+        else:
+            serializer = self.get_serializer(queryset, many=True)
+        # THIS is the important line:
+        data = serializer.data  # <- This is where the heavy work happens!
+        end_ser = time.perf_counter()
+        logger.warning(f"Serializer time: {end_ser - start_ser:.3f}s")
+
+        start_resp = time.perf_counter()
+        if page is not None:
+            response = self.get_paginated_response(data)
+        else:
+            response = Response(data)
+        end_resp = time.perf_counter()
+        logger.warning(f"Response time: {end_resp - start_resp:.3f}s")
+        logger.warning(f"TOTAL time: {end_resp - start_total:.3f}s")
+        return response
+
+
+
+
 # class PersonalInterviewViewSet(viewsets.ReadOnlyModelViewSet):
 #     """
 #     ViewSet for personal interview listing with enhanced presentation data
@@ -486,67 +557,3 @@ class PresentationViewSet(viewsets.ModelViewSet):
 #         )
  
 # @method_decorator(cache_page(60 * 60 * 2), name='dispatch')
-class PersonalInterviewViewSet(viewsets.ReadOnlyModelViewSet):
-    permission_classes = [IsAuthenticated]
-    serializer_class = UltraFastFormSubmissionSerializer
-    # renderer_classes = [ORJSONRenderer]
-
-    def get_queryset(self):
-        # Annotate the DB with counts/averages for fast access in serializer
-        return (
-            FormSubmission.objects
-            .select_related('applicant', 'service')
-            .prefetch_related(
-                Prefetch(
-                    'presentations',
-                    queryset=Presentation.objects.only(
-                        'id', 'proposal_id', 'final_decision', 'cached_status', 'cached_evaluator_name',
-                        'cached_marks_summary', 'cached_applicant_data',
-                        'video', 'video_link', 'document', 'presentation_date', 'document_uploaded',
-                        'created_at', 'updated_at', 'admin_remarks', 'admin', 'admin_evaluated_at',
-                        'evaluator', 'evaluator_marks', 'evaluator_remarks', 'evaluated_at'
-                    ).order_by('-created_at')
-                ),
-                'milestones',
-                'screening_records'
-            )
-            .only(
-                'proposal_id', 'org_type', 'subject', 'description', 'created_at', 'contact_email',
-                'applicant__organization', 'service__name'
-            )
-            .filter(presentations__isnull=False)
-            .distinct()
-            .annotate(
-                average_marks=Avg('presentations__evaluator_marks'),
-                total_evaluators=Count('presentations__evaluator', distinct=True)
-            )
-        ) 
-    
-
-    def list(self, request, *args, **kwargs):
-        start_total = time.perf_counter()
-        start_qs = time.perf_counter()
-        queryset = self.filter_queryset(self.get_queryset())
-        end_qs = time.perf_counter()
-        logger.warning(f"Queryset time: {end_qs - start_qs:.3f}s")
-
-        start_ser = time.perf_counter()
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-        else:
-            serializer = self.get_serializer(queryset, many=True)
-        # THIS is the important line:
-        data = serializer.data  # <- This is where the heavy work happens!
-        end_ser = time.perf_counter()
-        logger.warning(f"Serializer time: {end_ser - start_ser:.3f}s")
-
-        start_resp = time.perf_counter()
-        if page is not None:
-            response = self.get_paginated_response(data)
-        else:
-            response = Response(data)
-        end_resp = time.perf_counter()
-        logger.warning(f"Response time: {end_resp - start_resp:.3f}s")
-        logger.warning(f"TOTAL time: {end_resp - start_total:.3f}s")
-        return response

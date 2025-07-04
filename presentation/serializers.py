@@ -10,18 +10,27 @@ import logging
 logger = logging.getLogger(__name__)
 import time
  
+from rest_framework import serializers
+from app_eval.models import PassingRequirement
+from .models import Presentation
+
 class PresentationSerializer(serializers.ModelSerializer):
-    # Read-only computed fields
     proposal_id = serializers.CharField(source='proposal.proposal_id', read_only=True)
     applicant_name = serializers.CharField(source='applicant.get_full_name', read_only=True)
     evaluator_name = serializers.CharField(source='evaluator.get_full_name', read_only=True)
     admin_name = serializers.CharField(source='admin.get_full_name', read_only=True)
-   
-    # Status checks
+
     is_ready_for_evaluation = serializers.BooleanField(read_only=True)
     is_evaluation_completed = serializers.BooleanField(read_only=True)
     can_make_final_decision = serializers.BooleanField(read_only=True)
- 
+
+    # New fields for passing criteria, display only!
+    presentation_max_marks = serializers.SerializerMethodField()
+    min_passing_percentage = serializers.SerializerMethodField()
+    final_passing_percentage = serializers.SerializerMethodField()
+    has_passed_presentation = serializers.SerializerMethodField()
+    has_passed_final = serializers.SerializerMethodField()
+
     class Meta:
         model = Presentation
         fields = [
@@ -30,38 +39,68 @@ class PresentationSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at',
             'evaluator', 'evaluator_name', 'evaluator_marks', 'evaluator_remarks', 'evaluated_at',
             'final_decision', 'admin_remarks', 'admin', 'admin_name', 'admin_evaluated_at',
-            'is_ready_for_evaluation', 'is_evaluation_completed', 'can_make_final_decision'
+            'is_ready_for_evaluation', 'is_evaluation_completed', 'can_make_final_decision',
+            # new for access/passing logic:
+            'presentation_max_marks', 'min_passing_percentage', 'final_passing_percentage',
+            'has_passed_presentation', 'has_passed_final'
         ]
         read_only_fields = [
             'id', 'proposal_id', 'applicant_name', 'evaluator_name', 'admin_name',
             'created_at', 'updated_at', 'document_uploaded', 'evaluated_at', 'admin_evaluated_at',
-            'is_ready_for_evaluation', 'is_evaluation_completed', 'can_make_final_decision'
+            'is_ready_for_evaluation', 'is_evaluation_completed', 'can_make_final_decision',
+            'presentation_max_marks', 'min_passing_percentage', 'final_passing_percentage',
+            'has_passed_presentation', 'has_passed_final'
         ]
- 
+
+    def get_presentation_max_marks(self, obj):
+        # Pull from service.passing_requirement if exists
+        req = getattr(obj.service, 'passing_requirement', None)
+        return req.presentation_max_marks if req else None
+
+    def get_min_passing_percentage(self, obj):
+        req = getattr(obj.service, 'passing_requirement', None)
+        return req.presentation_min_passing if req else None
+
+    def get_final_passing_percentage(self, obj):
+        req = getattr(obj.service, 'passing_requirement', None)
+        return req.final_status_min_passing if req else None
+
+    def get_has_passed_presentation(self, obj):
+        return obj.has_passed_presentation() if hasattr(obj, 'has_passed_presentation') else False
+
+    def get_has_passed_final(self, obj):
+        return obj.has_passed_final() if hasattr(obj, 'has_passed_final') else False
+
     def validate_evaluator_marks(self, value):
-        """Validate evaluator marks are within acceptable range"""
         if value is not None:
-            # Get max marks from passing requirements or default to 50
+            # Try to get max marks per service (if available)
+            max_marks = 50
             try:
-                from app_eval.models import PassingRequirement
-                requirement = PassingRequirement.objects.filter(status='Active').first()
-                max_marks = requirement.presentation_max_marks if requirement else 50
+                req = None
+                instance = self.instance
+                if instance and hasattr(instance, 'service'):
+                    req = getattr(instance.service, 'passing_requirement', None)
+                if req:
+                    max_marks = req.presentation_max_marks
+                else:
+                    # fallback to any active requirement
+                    requirement = PassingRequirement.objects.filter(status='Active').first()
+                    if requirement:
+                        max_marks = requirement.presentation_max_marks
             except:
-                max_marks = 50
-           
+                pass
             if value < 0 or value > max_marks:
                 raise serializers.ValidationError(f"Marks must be between 0 and {max_marks}")
         return value
- 
+
     def validate_final_decision(self, value):
-        """Validate final decision transitions"""
         if self.instance and value in ['shortlisted', 'rejected']:
             if not self.instance.is_evaluation_completed:
                 raise serializers.ValidationError(
                     "Cannot make final decision before evaluation is completed"
                 )
         return value
- 
+
  
 class AdminPresentationListSerializer(serializers.ModelSerializer):
     """Serializer for admin list view of presentations"""

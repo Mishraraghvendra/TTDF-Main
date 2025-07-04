@@ -76,21 +76,92 @@ class FormTemplateMinSerializer(serializers.ModelSerializer):
 #         return super().update(instance, validated_data)
 
 
-class ServiceSerializer(serializers.ModelSerializer):
+# class ServiceSerializer(serializers.ModelSerializer):
+#     created_by_name = serializers.SerializerMethodField()
+#     is_currently_active = serializers.SerializerMethodField()
+
+#     class Meta:
+#         model = Service
+#         fields = [
+#             'id', 'name', 'description', 'is_active', 'status',
+#             'start_date', 'end_date', 'schedule_date',
+#             'image', 'documents',
+#             'created_by', 'created_by_name', 'created_at', 'updated_at',
+#             'is_currently_active',
+#         ]
+#         read_only_fields = [
+#             'created_by', 'created_by_name', 'created_at', 'updated_at', 'is_currently_active'
+#         ]
+
+#     def get_created_by_name(self, obj):
+#         if obj.created_by:
+#             return obj.created_by.get_full_name() or obj.created_by.username
+#         return None
+
+#     def get_is_currently_active(self, obj):
+#         return obj.is_currently_active
+
+#     def create(self, validated_data):
+#         user = self.context['request'].user
+#         validated_data['created_by'] = user
+#         # Default status to 'draft' if not provided
+#         if 'status' not in validated_data:
+#             validated_data['status'] = 'draft'
+#         return super().create(validated_data)
+
+#     def update(self, instance, validated_data):
+#         # Only update status if provided (optional)
+#         status = validated_data.get('status')
+#         if status:
+#             instance.status = status
+#         return super().update(instance, validated_data)
+
+#     def to_representation(self, instance):
+#         data = super().to_representation(instance)
+#         # Return URLs for image and document fields
+#         if instance.image:
+#             data['image'] = instance.image.url
+#         if instance.documents:
+#             data['documents'] = instance.documents.url
+#         return data
+
+
+
+# For Config
+#####################
+
+from rest_framework import serializers
+from app_eval.models import EvaluationItem
+from configuration.models import Service, ScreeningWorkflowConfig
+
+class EvaluationItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EvaluationItem
+        fields = [
+            'id', 'name', 'type', 'total_marks', 'weightage', 'description', 'status', 'memberType'
+        ]
+
+
+class ServiceSerializer(serializers.ModelSerializer): 
     created_by_name = serializers.SerializerMethodField()
     is_currently_active = serializers.SerializerMethodField()
+    workflow_stages = serializers.SerializerMethodField()
+    evaluation_items_detail = serializers.SerializerMethodField()
 
     class Meta:
         model = Service
         fields = [
-            'id', 'name', 'description', 'is_active', 'status',
+            'id', 'name', 'description', 'is_stopped', 'status',    # is_stopped added
             'start_date', 'end_date', 'schedule_date',
             'image', 'documents',
             'created_by', 'created_by_name', 'created_at', 'updated_at',
             'is_currently_active',
+            'workflow_stages',
+            'evaluation_items_detail',
         ]
         read_only_fields = [
-            'created_by', 'created_by_name', 'created_at', 'updated_at', 'is_currently_active'
+            'created_by', 'created_by_name', 'created_at', 'updated_at', 'is_currently_active',
+            'workflow_stages', 'evaluation_items_detail'
         ]
 
     def get_created_by_name(self, obj):
@@ -99,18 +170,32 @@ class ServiceSerializer(serializers.ModelSerializer):
         return None
 
     def get_is_currently_active(self, obj):
-        return obj.is_currently_active
+        # Use the computed property
+        return obj.is_active
+
+    def get_workflow_stages(self, obj):
+        config = getattr(obj, 'workflow_config', None)
+        if config:
+            return config.get_enabled_stages()
+        return [
+            "admin_screening",
+            "technical_screening",
+            "technical_evaluation",
+            "presentation",
+        ]
+
+    def get_evaluation_items_detail(self, obj):
+        items = obj.evaluation_items.all()
+        return EvaluationItemSerializer(items, many=True).data
 
     def create(self, validated_data):
         user = self.context['request'].user
         validated_data['created_by'] = user
-        # Default status to 'draft' if not provided
         if 'status' not in validated_data:
             validated_data['status'] = 'draft'
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
-        # Only update status if provided (optional)
         status = validated_data.get('status')
         if status:
             instance.status = status
@@ -118,14 +203,13 @@ class ServiceSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
-        # Return URLs for image and document fields
         if instance.image:
             data['image'] = instance.image.url
         if instance.documents:
             data['documents'] = instance.documents.url
         return data
 
-
+#####################
 
 
 
@@ -388,11 +472,6 @@ class ScreeningCommitteeSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
-
-
-
-
-
 class ScreeningResultSerializer(serializers.ModelSerializer):
     committee_details = ScreeningCommitteeSerializer(source='committee', read_only=True)
     screener_details = UserBasicSerializer(source='screened_by', read_only=True)
@@ -453,3 +532,207 @@ class CommitteeSimpleSerializer(serializers.ModelSerializer):
     
 
 
+
+# For Cofig
+
+# configuration/serializers.py
+
+from rest_framework import serializers
+from app_eval.models import EvaluationItem
+from configuration.models import (
+    Service, ScreeningCommittee, CommitteeMember, ScreeningWorkflowConfig
+)
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+# Only for ServiceConfigSerializer
+class SimpleCommitteeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ScreeningCommittee
+        fields = ["id", "name", "committee_type"]
+
+
+
+
+
+class EvaluationItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EvaluationItem
+        fields = [
+            'id', 'name', 'type', 'total_marks', 'weightage', 'description', 'status', 'memberType'
+        ]
+
+class ScreeningCommitteeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ScreeningCommittee
+        fields = [
+            'id', 'name', 'committee_type', 'description', 'head', 'sub_head', 'is_active'
+        ]
+
+class ServiceConfigSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.SerializerMethodField()
+    #is_currently_active = serializers.SerializerMethodField()
+    # workflow_stages = serializers.SerializerMethodField()
+    criteria = serializers.PrimaryKeyRelatedField(
+        source='evaluation_items',
+        queryset=EvaluationItem.objects.all(),
+        many=True,
+        required=False
+    )
+    criteria_detail = EvaluationItemSerializer(
+        source='evaluation_items',
+        many=True,
+        read_only=True
+    )
+    admin_committee = serializers.SerializerMethodField()
+    tech_committee = serializers.SerializerMethodField()
+    cutoff_marks = serializers.SerializerMethodField()
+    presentation_max_marks = serializers.SerializerMethodField()
+    tech_evaluators = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(), many=True, required=False
+    )
+    presentation_evaluators = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(), many=True, required=False
+    )
+
+    class Meta:
+        model = Service
+        fields = [
+            'id', 'name', 'description', 'status',
+            'is_stopped', 'is_active',
+            'start_date', 'end_date', 'schedule_date',
+            'image', 'documents',
+            'created_by', 'created_by_name', 'created_at', 'updated_at',
+            'admin_committee', 'tech_committee',
+            'criteria', 'criteria_detail',
+            'cutoff_marks',
+            'presentation_max_marks',
+            'tech_evaluators', 'presentation_evaluators' #,'is_currently_active','workflow_stages'
+        ]
+
+        read_only_fields = [
+            'created_by', 'created_by_name', 'created_at', 'updated_at', 'is_active'
+        ]
+
+    def get_created_by_name(self, obj):
+        return obj.created_by.get_full_name() if obj.created_by else None
+
+    def get_is_active(self, obj):
+        return obj.is_active  # property
+   
+
+    # For decide sequence
+
+    # def get_workflow_stages(self, obj):
+    #     config = getattr(obj, 'workflow_config', None)
+    #     if config:
+    #         return config.get_enabled_stages()
+    #     return [
+    #         "admin_screening",
+    #         "technical_screening",
+    #         "technical_evaluation",
+    #         "presentation",
+    #     ]
+    
+
+    def get_cutoff_marks(self, obj):
+    # Return the related cutoff marks if present
+        return obj.eval_cutoff.cutoff_marks if hasattr(obj, 'eval_cutoff') and obj.eval_cutoff else None
+    
+
+    def get_presentation_max_marks(self, obj):
+        # If service has a related PassingRequirement, pull from there
+        if hasattr(obj, 'passing_requirement') and obj.passing_requirement:
+            return obj.passing_requirement.presentation_max_marks
+        return None
+
+    def get_admin_committee(self, obj):
+        committee = ScreeningCommittee.objects.filter(service=obj, committee_type='administrative').order_by('-id').first()
+        return SimpleCommitteeSerializer(committee).data if committee else None
+
+    def get_tech_committee(self, obj):
+        committee = ScreeningCommittee.objects.filter(service=obj, committee_type='technical').order_by('-id').first()
+        return SimpleCommitteeSerializer(committee).data if committee else None
+
+    # Overriding create/update to handle committees and related logic
+    def create(self, validated_data):
+        request = self.context.get('request')
+        user = request.user if request else None
+
+        # Pop related fields
+        admin_committee = validated_data.pop('admin_committee', None)
+        tech_committee = validated_data.pop('tech_committee', None)
+        evaluation_items = validated_data.pop('evaluation_items', [])
+        cutoff_marks = validated_data.pop('cutoff_marks', None)
+        presentation_max_marks = validated_data.pop('presentation_max_marks', None)
+        tech_evaluators = validated_data.pop('tech_evaluators', [])
+        presentation_evaluators = validated_data.pop('presentation_evaluators', [])
+
+        validated_data['created_by'] = user
+        instance = super().create(validated_data)
+
+        # Set evaluation items
+        if evaluation_items:
+            instance.evaluation_items.set(evaluation_items)
+
+        # Set or create committees (if provided)
+        if admin_committee:
+            admin_committee.service = instance
+            admin_committee.committee_type = 'administrative'
+            admin_committee.save()
+        if tech_committee:
+            tech_committee.service = instance
+            tech_committee.committee_type = 'technical'
+            tech_committee.save()
+
+        # Set cutoff and presentation marks as workflow config or use related models as needed
+        if cutoff_marks is not None:
+            from app_eval.models import EvaluationCutoff
+            EvaluationCutoff.objects.update_or_create(
+            service=instance,     # ✅ RIGHT
+            defaults={'cutoff_marks': cutoff_marks, 'created_by': user}
+        )
+        # Presentation max marks: Store on Service, or PresentationConfig model if you want
+        if presentation_max_marks is not None:
+            instance.presentation_max_marks = presentation_max_marks  # add this field to Service if needed
+            instance.save(update_fields=['presentation_max_marks'])
+
+        # Set evaluators as needed (create CommitteeMember, or another assignment model)
+        # (Example, you might have to create EvaluationAssignment, CommitteeMember, etc.)
+
+        return instance
+
+    def update(self, instance, validated_data):
+        # Same as above for update...
+        admin_committee = validated_data.pop('admin_committee', None)
+        tech_committee = validated_data.pop('tech_committee', None)
+        evaluation_items = validated_data.pop('evaluation_items', [])
+        cutoff_marks = validated_data.pop('cutoff_marks', None)
+        presentation_max_marks = validated_data.pop('presentation_max_marks', None)
+        tech_evaluators = validated_data.pop('tech_evaluators', [])
+        presentation_evaluators = validated_data.pop('presentation_evaluators', [])
+
+        inst = super().update(instance, validated_data)
+        if evaluation_items:
+            inst.evaluation_items.set(evaluation_items)
+        if admin_committee:
+            admin_committee.service = inst
+            admin_committee.committee_type = 'administrative'
+            admin_committee.save()
+        if tech_committee:
+            tech_committee.service = inst
+            tech_committee.committee_type = 'technical'
+            tech_committee.save()
+        if cutoff_marks is not None:
+            from app_eval.models import EvaluationCutoff
+            EvaluationCutoff.objects.update_or_create(
+            service=inst,        
+            defaults={'cutoff_marks': cutoff_marks, 'created_by': inst.created_by}
+        )
+        if presentation_max_marks is not None:
+            inst.presentation_max_marks = presentation_max_marks
+            inst.save(update_fields=['presentation_max_marks'])
+        # Handle evaluators similarly as in create
+
+        return inst

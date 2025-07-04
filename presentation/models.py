@@ -223,8 +223,6 @@ class PresentationCache(models.Model):
         return f"PresentationCache for {self.form_submission.proposal_id}"
 
 
-
-
 class Presentation(models.Model):
     proposal = models.ForeignKey(
         'dynamic_form.FormSubmission',
@@ -284,6 +282,64 @@ class Presentation(models.Model):
 
     def __str__(self):
         return f"Presentation {self.proposal.proposal_id} by {self.applicant.get_full_name()}"
+    
+
+    @property
+    def service(self):
+        # shortcut
+        return getattr(self.proposal, 'service', None)
+
+    @property
+    def passing_requirement(self):
+        # Get PassingRequirement for this service
+        try:
+            # Use _cached_passing_requirement if set
+            if hasattr(self, '_cached_passing_requirement'):
+                return self._cached_passing_requirement
+            if self.service and hasattr(self.service, 'passing_requirement'):
+                return self.service.passing_requirement
+        except Exception:
+            return None
+
+    @property
+    def presentation_max_marks(self):
+        req = self.passing_requirement
+        return req.presentation_max_marks if req else None
+
+    @property
+    def min_passing_percentage(self):
+        req = self.passing_requirement
+        return req.presentation_min_passing if req else None
+
+    @property
+    def final_passing_percentage(self):
+        req = self.passing_requirement
+        return req.final_status_min_passing if req else None
+
+    def has_passed_presentation(self):
+        """
+        Returns True if evaluator_marks >= required minimum percentage of max marks
+        """
+        if self.evaluator_marks is None or self.presentation_max_marks is None or self.min_passing_percentage is None:
+            return False
+        try:
+            percentage = float(self.evaluator_marks) * 100 / float(self.presentation_max_marks)
+            return percentage >= float(self.min_passing_percentage)
+        except Exception:
+            return False
+
+    def has_passed_final(self):
+        """
+        Returns True if evaluator_marks >= final passing percentage of max marks
+        """
+        if self.evaluator_marks is None or self.presentation_max_marks is None or self.final_passing_percentage is None:
+            return False
+        try:
+            percentage = float(self.evaluator_marks) * 100 / float(self.presentation_max_marks)
+            return percentage >= float(self.final_passing_percentage)
+        except Exception:
+            return False
+
 
     @property
     def is_ready_for_evaluation(self):

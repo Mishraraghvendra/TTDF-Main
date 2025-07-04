@@ -10,9 +10,8 @@ from dynamic_form.models import FormSubmission
 
 @admin.register(PassingRequirement)
 class PassingRequirementAdmin(admin.ModelAdmin):
-    list_display = (
-        'requirement_name', 
-        
+    list_display = ('id',
+        'requirement_name',         
         'evaluation_min_passing', 
         'presentation_min_passing', 
         'presentation_max_marks',
@@ -21,8 +20,6 @@ class PassingRequirementAdmin(admin.ModelAdmin):
     )
     list_filter = ['status', ]  #service
     search_fields = ['requirement_name', 'service__name']
-
-
 
 
 # Add this class to show FormSubmission in app_eval admin
@@ -43,11 +40,6 @@ class EvaluationItemAdmin(admin.ModelAdmin):
     list_filter = ('status', 'type', 'memberType')
     search_fields = ('name', 'key', 'description')
 
-
-
-
-
-
 class EvaluationAssignmentAdmin(admin.ModelAdmin):
     list_display = ('evaluator', 'date_assigned', 'is_completed')
     list_filter = ('is_completed', 'date_assigned')
@@ -65,11 +57,6 @@ class EvaluationAssignmentAdmin(admin.ModelAdmin):
             subject = getattr(obj.form_submission, 'title', f"Form {obj.form_submission.form_id}")
         return subject
     get_subject.short_description = 'Subject'
-
-
-
-
-
 
 class CriteriaEvaluationAdmin(admin.ModelAdmin):
     list_display = ('get_assignment', 'get_criteria', 'marks_given', 'date_evaluated')
@@ -104,16 +91,15 @@ class QuestionEvaluationAdmin(admin.ModelAdmin):
     get_question.short_description = 'Question'
 
 class EvaluationCutoffAdmin(admin.ModelAdmin):
-    list_display = ('get_subject', 'cutoff_marks', 'created_by', 'date_created')
-    search_fields = ('form_submission__form_id', 'form_submission__subject')
-    autocomplete_fields = ['form_submission']  # Change from raw_id_fields to autocomplete_fields
-    
-    def get_subject(self, obj):
-        subject = getattr(obj.form_submission, 'subject', 
-                 getattr(obj.form_submission, 'title', 
-                 f"Form {obj.form_submission.form_id}"))
-        return subject
-    get_subject.short_description = 'Subject'
+    list_display = ('get_service_name', 'cutoff_marks', 'created_by', 'date_created')
+    search_fields = ('service__name',)   
+    autocomplete_fields = ['service']   
+
+    def get_service_name(self, obj):
+        return obj.service.name if obj.service else None
+    get_service_name.short_description = 'Service'
+
+
 
 admin.site.register(CriteriaType, CriteriaTypeAdmin)
 admin.site.register(Evaluator, EvaluatorAdmin)

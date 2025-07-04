@@ -20,11 +20,14 @@ config_router.register(r'screening-committees', config_views.ScreeningCommitteeV
 config_router.register(r'committee-members', config_views.CommitteeMemberViewSet)
 config_router.register(r'screening-results', config_views.ScreeningResultViewSet)
 
+config_router.register(r'service-config', config_views.ServiceConfigViewSet, basename='service_config')
+
+
 urlpatterns = [  
 
     path('', include(config_router.urls)),
     path('committees/', CommitteeListAPIView.as_view(), name='committee-list'),
-     path('criteria/', CriteriaListAPIView.as_view(), name='criteria-list'),
+    path('criteria/', CriteriaListAPIView.as_view(), name='criteria-list'),
 
 ]
 

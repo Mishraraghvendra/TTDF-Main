@@ -11,33 +11,43 @@ from .models import (
 
 
 
-
 # @admin.register(Service)
 # class ServiceAdmin(admin.ModelAdmin):
-#     list_display = ('name', 'is_active', 'created_by', 'created_at')
-#     list_filter = ('is_active',)
+#     list_display = (
+#         'name', 'status', 'is_active', 'start_date', 'end_date', 'schedule_date', 
+#         'created_by', 'created_at'
+#     )
+#     list_filter = ('is_active', 'status', 'start_date', 'end_date')
 #     search_fields = ('name', 'description')
-#     readonly_fields = ('created_at', 'updated_at')
+#     readonly_fields = ('created_at', 'updated_at', 'is_active', 'created_by')
+#     fieldsets = (
+#         (None, {
+#             'fields': (
+#                 'name', 'description', 'status', 'is_active',
+#                 'start_date', 'end_date', 'schedule_date',
+#                 'image', 'documents', 'created_by', 'created_at', 'updated_at',
+#             )
+#         }),
+#     )
+
 
 
 @admin.register(Service)
 class ServiceAdmin(admin.ModelAdmin):
     list_display = (
-        'name', 'status', 'is_active', 'start_date', 'end_date', 'schedule_date', 
-        'created_by', 'created_at'
+        'name', 'status', 'is_stopped', 'is_active_display', 
+        'start_date', 'end_date', 'created_by', 'created_at'
     )
-    list_filter = ('is_active', 'status', 'start_date', 'end_date')
+    list_filter = ('status', 'is_stopped', 'start_date', 'end_date')
     search_fields = ('name', 'description')
-    readonly_fields = ('created_at', 'updated_at', 'is_active', 'created_by')
-    fieldsets = (
-        (None, {
-            'fields': (
-                'name', 'description', 'status', 'is_active',
-                'start_date', 'end_date', 'schedule_date',
-                'image', 'documents', 'created_by', 'created_at', 'updated_at',
-            )
-        }),
-    )
+    readonly_fields = ('created_at', 'updated_at')
+    filter_horizontal = ('evaluation_items',)  # <---- Add this line
+
+    def is_active_display(self, obj):
+        return obj.is_active
+    is_active_display.boolean = True
+    is_active_display.short_description = "Is Active"
+
 
 
 @admin.register(ServiceForm)
