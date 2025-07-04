@@ -1475,7 +1475,90 @@ class ServiceConfigViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-   
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        data = request.data.copy()
+        user = request.user
+        try:
+            with transaction.atomic():
+                admin_committee_data = data.pop('admin_committee', None)
+                tech_committee_data = data.pop('tech_committee', None)
+                for k in ['is_active', 'is_currently_active']:
+                    data.pop(k, None)
+                serializer = self.get_serializer(instance, data=data, partial=partial)
+                serializer.is_valid(raise_exception=True)
+                service = serializer.save()
+
+                # Committees
+                admin_committee = self._get_committee(admin_committee_data, 'administrative', service, user)
+                tech_committee = self._get_committee(tech_committee_data, 'technical', service, user)
+
+                # ⬇️ HERE: pass update=True!
+                passing_req = self._get_or_create_passing_requirement(request.data, service=service, user=user, update=True)
+                if passing_req:
+                    service.passing_requirement = passing_req
+                    service.save(update_fields=['passing_requirement'])
+
+                # ... rest is same ...
+                evaluation_items = request.data.get('evaluation_items', [])
+                if evaluation_items:
+                    service.evaluation_items.set(evaluation_items)
+
+                cutoff_marks = request.data.get('cutoff_marks')
+                if cutoff_marks is not None:
+                    EvaluationCutoff.objects.update_or_create(
+                        service=service,
+                        defaults={'cutoff_marks': cutoff_marks, 'created_by': user}
+                    )
+
+                presentation_max_marks = request.data.get('presentation_max_marks')
+                if presentation_max_marks is not None and hasattr(service, 'presentation_max_marks'):
+                    setattr(service, 'presentation_max_marks', presentation_max_marks)
+                    service.save(update_fields=['presentation_max_marks'])
+
+                response_serializer = self.get_serializer(service)
+                return Response(
+                    {
+                        "message": "Service updated successfully.",
+                        "service": response_serializer.data
+                    },
+                    status=status.HTTP_200_OK
+                )
+        except (ValidationError, Exception) as e:
+            return Response(
+                {"message": f"Failed to update Service: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        try:
+            instance.delete()
+            return Response(
+                {"message": "Service deleted successfully."},
+                status=status.HTTP_204_NO_CONTENT
+            )
+        except Exception as e:
+            return Response(
+                {"message": f"Failed to delete Service: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response(
+            {
+                "message": "Service details retrieved.",
+                "service": serializer.data
+            },
+            status=status.HTTP_200_OK
+        )
+
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
