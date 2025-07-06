@@ -72,28 +72,42 @@ class FormSubmissionViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         data = request.data.copy()
         data.setdefault('status', FormSubmission.DRAFT)
-
-        # --- Update/create user and profile data
         upsert_profile_and_user_from_submission(request.user, data, files=request.FILES)
 
         serializer = self.get_serializer(data=data)
         try:
             serializer.is_valid(raise_exception=True)
             submission = serializer.save()
-        except Exception:
+        except Exception as ex:
+            print("Submission update exception:", ex)
             return Response(
                 {"success": False, "message": "Could not save submission.", "errors": serializer.errors},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # --- Save milestones if provided
         milestones = request.data.get("milestones")
         if milestones and isinstance(milestones, list):
             save_milestones_for_submission(submission, milestones, request.user)
 
         msg = "Saved as draft." if serializer.data.get('status') == FormSubmission.DRAFT else "Submitted successfully."
+
+        # ---- THIS IS THE KEY PART ----
+        resp_data = serializer.data.copy()
+        
+        resp_data['form_id'] = submission.form_id
+        # ---- END KEY PART ----
+
         return Response(
-            {"success": True, "message": msg, "data": serializer.data},
+            {
+                "success": True,
+                "message": msg,
+                "id": submission.id,
+                "form_id": submission.form_id,
+                "proposal_id": submission.proposal_id,
+                "template": submission.template_id,
+                "service": submission.service_id,
+                "data": serializer.data
+            },
             status=status.HTTP_201_CREATED
         )
 
@@ -115,9 +129,10 @@ class FormSubmissionViewSet(viewsets.ModelViewSet):
         try:
             serializer.is_valid(raise_exception=True)
             submission = serializer.save()
-        except Exception:
+        except Exception as ex:
+            print("Submission update exception:", ex)
             return Response(
-                {"success": False, "message": "Could not update submission.", "errors": serializer.errors},
+                {"success": False, "message": "Could not save submission.", "errors": serializer.errors},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -127,8 +142,12 @@ class FormSubmissionViewSet(viewsets.ModelViewSet):
             save_milestones_for_submission(submission, milestones, request.user)
 
         msg = "Saved as draft." if serializer.data.get('status') == FormSubmission.DRAFT else "Submitted successfully."
+        resp_data = serializer.data.copy()
+        
+        resp_data['form_id'] = submission.form_id
+
         return Response(
-            {"success": True, "message": msg, "data": serializer.data},
+            {"success": True, "message": msg, "data": resp_data},
             status=status.HTTP_200_OK
         )
 
@@ -148,8 +167,16 @@ class FormSubmissionViewSet(viewsets.ModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
         serializer = self.get_serializer(instance)
+
         return Response(
-            {"success": True, "data": serializer.data},
+            {
+                "success": True,
+                "id": instance.id,
+                
+                "form_id": instance.form_id,
+                "proposal_id": instance.proposal_id,
+                "data": serializer.data
+            },
             status=status.HTTP_200_OK
         )
 
@@ -157,7 +184,50 @@ class FormSubmissionViewSet(viewsets.ModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
         serializer = self.get_serializer(page, many=True) if page is not None else self.get_serializer(queryset, many=True)
-        return self.get_paginated_response(serializer.data) if page is not None else Response(
-            {"success": True, "data": serializer.data},
-            status=status.HTTP_200_OK
-        )
+        
+        # Add "pk" to each item (same as "id")
+        data_with_pk = []
+        for item in serializer.data:
+            item = dict(item)  # If serializer.data is not a list of dicts yet
+            item['pk'] = item['id']
+            data_with_pk.append(item)
+        
+        if page is not None:
+            # If paginated, replace results with data_with_pk
+            response = self.get_paginated_response(data_with_pk)
+            response.data["success"] = True
+            return response
+        else:
+            return Response(
+                {"success": True, "data": data_with_pk},
+                status=status.HTTP_200_OK
+            )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
