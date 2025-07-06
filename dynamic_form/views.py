@@ -1,17 +1,13 @@
 # dynamic_form/views.py
 
 from rest_framework import viewsets, status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 from .models import FormTemplate, FormSubmission
 from .serializers import FormSubmissionSerializer,FormTemplateSerializer
-from datetime import datetime
-from rest_framework import viewsets, status
-from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
-from rest_framework.response import Response
 
-from dynamic_form.models import FormSubmission
+from rest_framework.decorators import action
+
 from screening.serializers import (
     ScreeningRecordSerializer,
     TechnicalScreeningRecordSerializer
@@ -19,18 +15,12 @@ from screening.serializers import (
 
 from datetime import datetime
 from django.db.models import Q
-from rest_framework import viewsets, status
-from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-
-from .models import FormSubmission
-from .serializers import FormSubmissionSerializer
-from screening.serializers import ScreeningRecordSerializer, TechnicalScreeningRecordSerializer
+from django.db import transaction
 
 # Committee‐head lives in the configuration app
 from configuration.models import ScreeningCommittee
-
+from milestones.models import Milestone
+from users.utils import upsert_profile_and_user_from_submission
 
 
 class FormTemplateViewSet(viewsets.ReadOnlyModelViewSet):
@@ -50,84 +40,124 @@ class FormTemplateViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 
-class FormSubmissionViewSet(viewsets.ModelViewSet):
+def save_milestones_for_submission(form_submission, milestones_data, user=None):
     """
-    Applicants manage their own submissions.
-    Committee‐heads can record admin & tech screening and finalize.
+    Create Milestone objects for a FormSubmission, given a list of milestone dicts.
     """
-    queryset         = FormSubmission.objects.all().select_related('template','applicant')
+    for idx, m in enumerate(milestones_data):
+        Milestone.objects.create(
+            proposal=form_submission,
+            title=m.get("title") or f"Milestone {idx+1}",
+            description=m.get("description") or "",
+            time_required=m.get("time_required") or 0,
+            revised_time_required=m.get("revised_time_required"),
+            grant_from_ttdf=m.get("grant_from_ttdf") or 0,
+            initial_contri_applicant=m.get("initial_contri_applicant") or 0,
+            revised_contri_applicant=m.get("revised_contri_applicant"),
+            initial_grant_from_ttdf=m.get("initial_grant_from_ttdf"),
+            revised_grant_from_ttdf=m.get("revised_grant_from_ttdf"),
+            created_by=user,
+        )
+
+class FormSubmissionViewSet(viewsets.ModelViewSet): 
+    queryset = FormSubmission.objects.all().select_related('template', 'applicant')
     serializer_class = FormSubmissionSerializer
     permission_classes = [IsAuthenticated]
-    lookup_field     = 'form_id'
+    lookup_field = 'pk'
 
     def get_queryset(self):
-        # Only show the current user's submissions
         return self.queryset.filter(applicant=self.request.user)
 
-    def _is_committee_head(self, user):
-        # True if user is head or sub_head on any ScreeningCommittee
-        return ScreeningCommittee.objects.filter(
-            Q(head=user) | Q(sub_head=user)
-        ).exists()
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        data = request.data.copy()
+        data.setdefault('status', FormSubmission.DRAFT)
 
-    @action(detail=True, methods=['post'], url_path='admin-screen')
-    def admin_screen(self, request, form_id=None):
-        submission = self.get_object()
-        if not self._is_committee_head(request.user):
-            return Response({'detail': 'Not authorized.'}, status=status.HTTP_403_FORBIDDEN)
+        # --- Update/create user and profile data
+        upsert_profile_and_user_from_submission(request.user, data, files=request.FILES)
 
-        # Build payload for ScreeningRecord
-        payload = {'submission': submission.id}
-        if 'document' in request.data:
-            payload['document'] = request.data['document']
-
-        sr = ScreeningRecordSerializer(data=payload, context={'request': request})
-        sr.is_valid(raise_exception=True)
-        # Save with the user who screened it
-        sr.save(screened_by=request.user)
-
-        # Update proposal status
-        submission.status = FormSubmission.EVALUATED
-        submission.save(update_fields=['status'])
-
-        return Response({'detail': 'Admin screening recorded.'}, status=status.HTTP_200_OK)
-
-    @action(detail=True, methods=['post'], url_path='tech-screen')
-    def tech_screen(self, request, form_id=None):
-        submission = self.get_object()
-        if not self._is_committee_head(request.user):
-            return Response({'detail': 'Not authorized.'}, status=status.HTTP_403_FORBIDDEN)
-
-        payload = {'submission': submission.id}
-        if 'document' in request.data:
-            payload['document'] = request.data['document']
-
-        ts = TechnicalScreeningRecordSerializer(data=payload, context={'request': request})
-        ts.is_valid(raise_exception=True)
-        ts.save(screened_by=request.user)
-
-        submission.status = FormSubmission.TECHNICAL
-        submission.save(update_fields=['status'])
-
-        return Response({'detail': 'Technical screening recorded.'}, status=status.HTTP_200_OK)
-
-    @action(detail=True, methods=['post'], url_path='finalize')
-    def finalize(self, request, form_id=None):
-        submission = self.get_object()
-        if not self._is_committee_head(request.user):
-            return Response({'detail': 'Not authorized.'}, status=status.HTTP_403_FORBIDDEN)
-
-        verdict = request.data.get('verdict', '').lower()
-        if verdict not in ('approve', 'reject'):
+        serializer = self.get_serializer(data=data)
+        try:
+            serializer.is_valid(raise_exception=True)
+            submission = serializer.save()
+        except Exception:
             return Response(
-                {'detail': "Invalid verdict; must be 'approve' or 'reject'."},
+                {"success": False, "message": "Could not save submission.", "errors": serializer.errors},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        submission.status = (
-            FormSubmission.APPROVED if verdict == 'approve'
-            else FormSubmission.REJECTED
-        )
-        submission.save(update_fields=['status'])
+        # --- Save milestones if provided
+        milestones = request.data.get("milestones")
+        if milestones and isinstance(milestones, list):
+            save_milestones_for_submission(submission, milestones, request.user)
 
-        return Response({'detail': 'Proposal finalized.'}, status=status.HTTP_200_OK)
+        msg = "Saved as draft." if serializer.data.get('status') == FormSubmission.DRAFT else "Submitted successfully."
+        return Response(
+            {"success": True, "message": msg, "data": serializer.data},
+            status=status.HTTP_201_CREATED
+        )
+
+    @transaction.atomic
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        if instance.status != FormSubmission.DRAFT and request.data.get('status', instance.status) != FormSubmission.SUBMITTED:
+            return Response(
+                {"success": False, "message": "Cannot edit a finalized submission."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        data = request.data.copy()
+
+        # --- Update/create user and profile data
+        upsert_profile_and_user_from_submission(request.user, data, files=request.FILES)
+
+        serializer = self.get_serializer(instance, data=data, partial=partial)
+        try:
+            serializer.is_valid(raise_exception=True)
+            submission = serializer.save()
+        except Exception:
+            return Response(
+                {"success": False, "message": "Could not update submission.", "errors": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        milestones = request.data.get("milestones")
+        if milestones and isinstance(milestones, list):
+            instance.milestones.all().delete()
+            save_milestones_for_submission(submission, milestones, request.user)
+
+        msg = "Saved as draft." if serializer.data.get('status') == FormSubmission.DRAFT else "Submitted successfully."
+        return Response(
+            {"success": True, "message": msg, "data": serializer.data},
+            status=status.HTTP_200_OK
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.status != FormSubmission.DRAFT:
+            return Response(
+                {"success": False, "message": "Only drafts can be deleted."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        self.perform_destroy(instance)
+        return Response(
+            {"success": True, "message": "Draft deleted."},
+            status=status.HTTP_204_NO_CONTENT
+        )
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response(
+            {"success": True, "data": serializer.data},
+            status=status.HTTP_200_OK
+        )
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        serializer = self.get_serializer(page, many=True) if page is not None else self.get_serializer(queryset, many=True)
+        return self.get_paginated_response(serializer.data) if page is not None else Response(
+            {"success": True, "data": serializer.data},
+            status=status.HTTP_200_OK
+        )

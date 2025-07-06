@@ -167,11 +167,6 @@ def upload_to_finance(instance, filename):
     return f"milestones/finance/{service}/{proposal_id}.{ext}"
 
 
-
-
-
-
-
 class ProposalMouDocument(models.Model):
     proposal = models.OneToOneField(FormSubmission, on_delete=models.CASCADE, related_name='mou_document')
     document = models.FileField(upload_to=upload_to_mou, null=True, blank=True)
@@ -182,8 +177,6 @@ class ProposalMouDocument(models.Model):
 
     def __str__(self):
         return f"MOU for {self.proposal.proposal_id}"
-
-
 
 class MilestoneHistory(models.Model):
     milestone = models.ForeignKey('Milestone', on_delete=models.CASCADE, related_name='histories')
@@ -197,17 +190,17 @@ class Milestone(models.Model):
     proposal = models.ForeignKey(FormSubmission, on_delete=models.CASCADE, related_name='milestones')    
     title = models.CharField(max_length=200)
     
-    time_required = models.PositiveIntegerField()
-    revised_time_required = models.PositiveIntegerField()
+    time_required = models.PositiveIntegerField(null=True,blank=True)
+    revised_time_required = models.PositiveIntegerField(null=True,blank=True)
 
-    funds_requested= models.PositiveIntegerField()    
-    grant_from_ttdf = models.PositiveIntegerField()
+    funds_requested= models.PositiveIntegerField(null=True,blank=True)    
+    grant_from_ttdf = models.PositiveIntegerField(null=True,blank=True)
 
-    initial_contri_applicant = models.PositiveIntegerField()
-    revised_contri_applicant = models.PositiveIntegerField()
+    initial_contri_applicant = models.PositiveIntegerField(null=True,blank=True)
+    revised_contri_applicant = models.PositiveIntegerField(null=True,blank=True)
 
-    initial_grant_from_ttdf = models.PositiveIntegerField()
-    revised_grant_from_ttdf = models.PositiveIntegerField()
+    initial_grant_from_ttdf = models.PositiveIntegerField(null=True,blank=True)
+    revised_grant_from_ttdf = models.PositiveIntegerField(null=True,blank=True)
 
     description = models.TextField(blank=True)
     activities = models.TextField(blank=True)
@@ -283,13 +276,13 @@ class MilestoneDocument(models.Model):
 class SubMilestone(models.Model):
     milestone = models.ForeignKey(Milestone, on_delete=models.CASCADE, related_name='submilestones')
     title = models.CharField(max_length=200)
-    time_required = models.PositiveIntegerField()
-    revised_time_required = models.PositiveIntegerField()
-    grant_from_ttdf = models.PositiveIntegerField()
-    initial_contri_applicant = models.PositiveIntegerField()
-    revised_contri_applicant = models.PositiveIntegerField()
-    initial_grant_from_ttdf = models.PositiveIntegerField()
-    revised_grant_from_ttdf = models.PositiveIntegerField()
+    time_required = models.PositiveIntegerField(null=True,blank=True)
+    revised_time_required = models.PositiveIntegerField(null=True,blank=True)
+    grant_from_ttdf = models.PositiveIntegerField(null=True,blank=True)
+    initial_contri_applicant = models.PositiveIntegerField(null=True,blank=True)
+    revised_contri_applicant = models.PositiveIntegerField(null=True,blank=True)
+    initial_grant_from_ttdf = models.PositiveIntegerField(null=True,blank=True)
+    revised_grant_from_ttdf = models.PositiveIntegerField(null=True,blank=True)
     description = models.TextField(blank=True)
     activities = models.TextField(blank=True)
 
@@ -477,8 +470,6 @@ class FinanceSanction(models.Model):
 
     def __str__(self):
         return f"FinanceSanction {self.id} - {self.get_status_display()}"
-
-
 
 
 

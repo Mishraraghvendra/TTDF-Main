@@ -3,8 +3,23 @@
 from rest_framework import serializers
 from datetime import datetime
 from .models import FormTemplate, FormSubmission
+from milestones.serializers import MilestoneSerializer
+from users.serializers import ProfileSerializer  # adjust import as per your app
+from users.models import User, Profile
 
-class FormSubmissionSerializer(serializers.ModelSerializer):
+
+class UserShortSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["id", "full_name", "gender", "mobile", "email", "organization"]
+
+class FullProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Profile
+        exclude = ["id", "user"]
+
+class FormSubmissionSerializer(serializers.ModelSerializer):    
+    
     class Meta:
         model = FormSubmission
         fields = '__all__'
@@ -13,6 +28,18 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
             'created_at','updated_at'
         ]
 
+    milestones = MilestoneSerializer(many=True, read_only=True)
+    applicant = UserShortSerializer(read_only=True)
+    profile = serializers.SerializerMethodField()
+
+    def get_profile(self, obj):
+        # Get Profile for this applicant (User)
+        profile = getattr(obj.applicant, "profile", None)
+        if not profile:
+            return None
+        return FullProfileSerializer(profile).data
+
+    
     def validate(self, data):
         tpl = data.get('template') or self.instance.template
         now = datetime.now()
@@ -29,13 +56,14 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Cannot edit after deadline/final submit.")
 
         # on submit, ensure required frontend‐defined fields are present
-        if data.get('status') == FormSubmission.SUBMITTED:
-            missing = []
-            for req in self.context['request'].data.get('required_fields', []):
-                if not self.context['request'].data.get(req):
-                    missing.append(req)
-            if missing:
-                raise serializers.ValidationError(f"Missing required: {missing}")
+
+        # if data.get('status') == FormSubmission.SUBMITTED:
+        #     missing = []
+        #     for req in self.context['request'].data.get('required_fields', []):
+        #         if not self.context['request'].data.get(req):
+        #             missing.append(req)
+        #     if missing:
+        #         raise serializers.ValidationError(f"Missing required: {missing}")
 
         return data
 

@@ -10,79 +10,74 @@ from .models import (
 
 @admin.register(FormTemplate)
 class FormTemplateAdmin(admin.ModelAdmin):
-    list_display = ('title', 'is_active', 'start_date', 'end_date')
+    list_display = ('id','title', 'is_active', 'start_date', 'end_date')
 
 
 @admin.register(FormSubmission)
 class FormSubmissionAdmin(admin.ModelAdmin):
-    list_display = ('proposal_id', 'template','service','applicant', 'org_type','status', 'created_at')
+    list_display = ('id', 'proposal_id', 'template', 'service', 'applicant', 'status', 'created_at')
     readonly_fields = ['form_id', 'proposal_id', 'created_at', 'updated_at']
-    search_fields = ['form_id', 'proposal_id', 'subject', 'description',]
+    search_fields = ['form_id', 'proposal_id', 'subject', 'description']
 
     fieldsets = (
-        (None, {
+        ("General Info", {
             'fields': (
-                'template',
-                'service',
-                'applicant',
-                'status',
-                'form_id',
-                'proposal_id',
-                'contact_name',
-                'contact_email',
-                'applicationDocument',
-                'committee_assigned',
-                
+                'template', 'service', 'applicant', 'status',
+                'form_id', 'proposal_id', 'is_active',
+                'contact_name', 'contact_email', 'applicationDocument', 'committee_assigned',
+                'created_at', 'updated_at',
+            ),
+        }),
+        ("Basic Documents", {
+            'fields': (
+                'individual_pan', 'pan_file', 'applicant_type', 'passport_file', 'resume_upload',
+                'description', 'subject',
             )
         }),
-        ('Timestamps', {
-            'fields': ('created_at', 'updated_at'),
-        }),
-        ('Basic Documents', {
+        ("Shareholder Details", {
             'fields': (
-                'individual_pan',
-                'pan_file',
-                'applicant_type',
-                'passport_file',
-                'resume_upload',
-                'description','subject',
+                'share_holder_name', 'share_percentage', 'identity_document',
             )
         }),
-        ('Organization Details', {
+        ("RD Staff Section", {
             'fields': (
-                'org_address_line1',
-                'org_address_line2',
-                'org_street_village',
-                'org_city_town',
-                'org_state',
-                'org_pin_code',
-                'org_landline',
-                'org_mobile',
-                'org_official_email',
-                'org_website',
-                'org_shares_51pct_indian_citizens',
-                'org_tan_pan_cin_file',
-                'org_registration_certificate',
-                'org_approval_certificate',
-                'org_registration_certificate_2',
-                'org_annual_report',
-                'org_industry_auth_letter',
-                'org_shareholding_pattern_file',
+                'rd_staff_name', 'rd_staff_designation', 'rd_staff_email', 'rd_staff_highest_qualification',
+                'rd_staff_mobile', 'rd_staff_resume', 'rd_staff_epf_details',
             )
         }),
-        # … you can add more sections here for Proposal Summary, Collaborator,
-        # Finance Details, IPR, Patents, Manpower, etc., using the fields
-        # that still exist on your model …
-        ('Declaration', {
+        ("Equipment Section", {
             'fields': (
-                'declaration_document',
-                'declaration_1',
-                'declaration_2',
-                'declaration_3',
-                'declaration_4',
-                'declaration_5',
+                'equipment_item', 'equipment_unit_price', 'equipment_quantity',
+                'equipment_amount', 'equipment_contributor_type',
             )
         }),
+        ("Fund Details", {
+            'fields': (
+                'has_loan', 'fund_loan_description', 'fund_loan_amount',  # For multiple documents, use an inline
+            )
+        }),
+        ("Contribution Details", {
+            'fields': (
+                'contribution_expected_source', 'contribution_item', 'contribution_amount',
+            )
+        }),
+        ("Fund Source Details", {
+            'fields': (
+                'fund_source_details', 'fund_item', 'fund_amount',
+            )
+        }),
+        ("Finance Summary", {
+            'fields': (
+                'grant_from_ttdf', 'contribution_applicant', 'expected_other_contribution',
+                'other_source_funding', 'total_project_cost',
+            )
+        }),
+        ("Other Section", {
+            'fields': (
+                'ttdf_applied_before',
+            )
+        }),
+        # Add other sections as you add fields!
     )
 
 

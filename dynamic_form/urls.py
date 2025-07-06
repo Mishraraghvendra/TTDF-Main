@@ -13,6 +13,7 @@ router.register(r'submissions', FormSubmissionViewSet,  basename='submission')
 
 urlpatterns = [
     path('', include(router.urls)),
+    
 ]
 
 # Add media file serving for development environment

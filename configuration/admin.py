@@ -35,7 +35,7 @@ from .models import (
 @admin.register(Service)
 class ServiceAdmin(admin.ModelAdmin):
     list_display = (
-        'name', 'status', 'is_stopped', 'is_active_display', 
+        'id','name', 'status', 'is_stopped', 'is_active_display', 
         'start_date', 'end_date', 'created_by', 'created_at'
     )
     list_filter = ('status', 'is_stopped', 'start_date', 'end_date')

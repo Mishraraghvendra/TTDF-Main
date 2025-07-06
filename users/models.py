@@ -128,7 +128,7 @@ class Profile(models.Model):
     street_village = models.CharField(max_length=255, blank=True, null=True)
     city = models.CharField(max_length=100, blank=True, null=True)
     country = models.CharField(max_length=100, blank=True, null=True)
-    state = models.CharField(max_length=100, blank=True, null=True)
+    state = models.CharField(max_length=100, blank=True, null=True) 
     pincode = models.CharField(max_length=20, blank=True, null=True)
     landline_number = models.CharField(max_length=20, blank=True, null=True)
     company_mobile_no = models.CharField(max_length=20, blank=True, null=True)
@@ -152,9 +152,11 @@ class Profile(models.Model):
     id_type = models.CharField(max_length=50, blank=True, null=True)
     id_number = models.CharField(max_length=50, blank=True, null=True)
 
+    
+    tan_pan_cin = models.FileField(upload_to='org/tan_pan_cin/', blank=True, null=True)
     def __str__(self):
         return f"Profile of {self.user.email}"
-
+ 
 
 class Role(models.Model):
     name        = models.CharField(max_length=50, unique=True)

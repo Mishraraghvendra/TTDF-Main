@@ -84,9 +84,6 @@ class MilestoneSerializer(serializers.ModelSerializer):
             'documents', 'submilestones'
         ]
 
-
-
-
 class FinanceRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = FinanceRequest

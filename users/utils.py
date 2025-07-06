@@ -1,0 +1,69 @@
+# users/utils.py
+
+from .models import Profile
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+def upsert_profile_and_user_from_submission(user, data, files=None):
+    """
+    Update or create Profile and User fields from form submission data.
+    Accepts both standard and file data (for e.g. images/resume uploads).
+    """
+
+    # --- user update logic (unchanged)
+    profile, _ = Profile.objects.get_or_create(user=user)
+
+    user_fields = ["full_name", "gender", "mobile", "email", "organization"]
+    user_updated = False
+    for field in user_fields:
+        value = data.get(field)
+        if value is not None and getattr(user, field, None) != value:
+            setattr(user, field, value)
+            user_updated = True
+    if user_updated:
+        user.save()
+
+    # --- define profile_map here
+    profile_map = {
+        "applicantPhoto": "profile_image",
+        "qualification": "qualification",
+        "resume": "resume",
+        "officialEmail": "applicant_official_email",
+        "proposalDurationYears": "proposal_duration_years",
+        "proposalDurationMonths": "proposal_duration_months",
+        "proposalSubmittedBy": "proposal_submitted_by",
+        "addressLine1": "address_line_1",
+        "addressLine2": "address_line_2",
+        "streetVillage": "street_village",
+        "city": "city",
+        "country": "country",
+        "state": "state",
+        "pincode": "pincode",
+        "landline": "landline_number",
+        "companyMobile": "company_mobile_no",
+        "website": "website_link",
+        "companyAsPerCfp": "company_as_per_guidelines",
+        "registrationCertificate": "organization_registration_certificate",
+        "shareHoldingPattern": "share_holding_pattern",
+        "dsirCertificate": "dsir_certificate",
+        "tanPanCin": "tan_pan_cin",
+        "organizationType": "applicant_type",
+        # add more mappings as needed
+    }
+
+    # --- updated profile handling to accept nested 'profile'
+    profile_data = data.get("profile", {})
+
+    for form_field, profile_field in profile_map.items():
+        value = None
+        if files and form_field in files:
+            value = files[form_field]
+        elif form_field in profile_data:
+            value = profile_data[form_field]
+        elif form_field in data:
+            value = data[form_field]
+        if value is not None:
+            setattr(profile, profile_field, value)
+    profile.save()
+    return profile
