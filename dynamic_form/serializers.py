@@ -1,11 +1,12 @@
 # dynamic_form/serializers.py
 
 from rest_framework import serializers
-from datetime import datetime
+
 from .models import FormTemplate, FormSubmission
 from milestones.serializers import MilestoneSerializer
 from users.serializers import ProfileSerializer  # adjust import as per your app
 from users.models import User, Profile
+from django.utils import timezone
 
 
 class UserShortSerializer(serializers.ModelSerializer):
@@ -42,8 +43,8 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
     
     def validate(self, data):
         tpl = data.get('template') or self.instance.template
-        now = datetime.now()
-        # enforce template window
+        now = timezone.now()   # <--- always use this!
+    # enforce template window
         if not tpl.is_active:
             raise serializers.ValidationError("Form not active.")
         if tpl.start_date and now < tpl.start_date:
