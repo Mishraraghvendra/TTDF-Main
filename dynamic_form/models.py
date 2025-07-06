@@ -271,7 +271,93 @@ class FormSubmission(models.Model):
     )
 
 
+    # --- Proposal Cost Breakdown Section ---
 
+    network_core = models.JSONField(blank=True,null=True,default=dict,
+        help_text=(
+            '{"items": [{"item": "", "unit": "", "unitPrice": 0, "totalPrice": 0}], "sectionTotal": 0}'
+        )
+    )
+
+    radio_access_network = models.JSONField(blank=True,null=True,default=dict,help_text=(
+            '{"items": [{"item": "", "unit": "", "unitPrice": 0, "totalPrice": 0}], "sectionTotal": 0}'
+        )
+    )
+
+    fixed_wireless_access = models.JSONField(blank=True,null=True,default=dict,
+        help_text=(
+            '{"items": [{"item": "", "unit": "", "unitPrice": 0, "totalPrice": 0}], "sectionTotal": 0}'
+        )
+    )
+
+    civil_electrical_infrastructure = models.JSONField(blank=True,null=True,default=dict,
+        help_text=(
+            '{"items": [{"item": "", "unit": "", "unitPrice": 0, "totalPrice": 0}], "sectionTotal": 0}'
+        )
+    )
+
+    centralised_servers_and_edge_analytics = models.JSONField(blank=True,null=True,default=dict,
+        help_text=(
+            '{"items": [{"item": "", "unit": "", "unitPrice": 0, "totalPrice": 0}], "sectionTotal": 0}'
+        )
+    )
+
+    passive_components = models.JSONField(
+        blank=True,
+        null=True,
+        default=dict,
+        help_text=(
+            '{"items": [{"item": "", "unit": "", "unitPrice": 0, "totalPrice": 0}], "sectionTotal": 0}'
+        )
+    )
+
+    software_components = models.JSONField(
+        blank=True,
+        null=True,
+        default=dict,
+        help_text=(
+            '{"items": [{"item": "", "unit": "", "unitPrice": 0, "totalPrice": 0}], "sectionTotal": 0}'
+        )
+    )
+
+    sensor_network_costs = models.JSONField(
+        blank=True,
+        null=True,
+        default=dict,
+        help_text=(
+            '{'
+            '"smartPanchayat": {"items": [{"item": "", "unit": "", "unitPrice": 0, "totalPrice": 0}], "sectionTotal": 0}, '
+            '"smartAgriculture": {"items": [{"item": "", "unit": "", "unitPrice": 0, "totalPrice": 0}], "sectionTotal": 0}, '
+            '"smartEducation": {"items": [{"item": "", "unit": "", "unitPrice": 0, "totalPrice": 0}], "sectionTotal": 0}, '
+            '"smartHealth": {"items": [{"item": "", "unit": "", "unitPrice": 0, "totalPrice": 0}], "sectionTotal": 0} '
+            '}'
+        )
+    )
+
+    installation_infrastructure_and_commissioning = models.JSONField(
+        blank=True,
+        null=True,
+        default=dict,
+        help_text=(
+            '{"items": [{"item": "", "unit": "", "unitPrice": 0, "totalPrice": 0}], "sectionTotal": 0}'
+        )
+    )
+
+    operation_maintenance_and_warranty = models.JSONField(
+        blank=True,
+        null=True,
+        default=dict,
+        help_text=(
+            '{"items": [{"item": "", "unit": "", "unitPrice": 0, "totalPrice": 0}], "sectionTotal": 0}'
+        )
+    )
+
+    total_proposal_cost = models.DecimalField(
+        max_digits=20,
+        decimal_places=2,
+        blank=True,
+        null=True
+    )
 
 
   
@@ -333,6 +419,8 @@ class FormSubmission(models.Model):
 
     def __str__(self):
         return f"{self.form_id} ({self.get_status_display()})"
+
+
 
 class FormPage(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

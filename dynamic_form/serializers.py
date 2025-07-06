@@ -27,11 +27,28 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'id','applicant','form_id','proposal_id',
             'created_at','updated_at'
-        ]
+        ] + ['service_name', 'last_updated','create_date']
 
     milestones = MilestoneSerializer(many=True, read_only=True)
     applicant = UserShortSerializer(read_only=True)
     profile = serializers.SerializerMethodField()
+    service_name = serializers.SerializerMethodField()
+    last_updated = serializers.SerializerMethodField()
+    create_date = serializers.SerializerMethodField()
+
+
+    def get_service_name(self, obj):
+        return obj.service.name if obj.service else None
+
+    def get_last_updated(self, obj):
+        if obj.updated_at:
+            return timezone.localtime(obj.updated_at).strftime('%Y-%m-%d %H:%M:%S')
+        return None
+
+    def get_create_date(self, obj):
+        if obj.created_at:
+            return timezone.localtime(obj.created_at).strftime('%Y-%m-%d %H:%M:%S')
+        return None
 
     def get_profile(self, obj):
         # Get Profile for this applicant (User)
