@@ -377,6 +377,8 @@ class CallsAPIView(APIView):
                         is_active = now <= service.end_date
 
                 call_data = {
+                    "id": service.id,
+                    "template_id": str(service.template_id) if hasattr(service, "template_id") and service.template_id else None,
                     "title": service.name or "",
                     "description": getattr(service, 'description', '') or "",
                     "start_date": service.start_date.strftime('%Y-%m-%d') if hasattr(service, 'start_date') and service.start_date else "",

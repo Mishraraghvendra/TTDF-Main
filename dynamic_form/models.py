@@ -45,6 +45,8 @@ class FormTemplate(models.Model):
     def __str__(self):
         return self.title
 
+
+
 def upload_to_dynamic(instance, filename, subfolder=None):
     # Handles both direct file fields and related models if needed
     service = getattr(instance, 'service', None)

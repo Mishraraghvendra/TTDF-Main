@@ -8,6 +8,7 @@ from .models import (
 from .models import ScreeningCommittee, CommitteeMember, ScreeningResult,CriteriaEvaluatorAssignment
 from dynamic_form.models import FormTemplate, FormField
 from app_eval.models import CriteriaType
+from dynamic_form.serializers import FormTemplateSerializer
 
 User = get_user_model()
 
@@ -596,6 +597,13 @@ class ServiceConfigSerializer(serializers.ModelSerializer):
         queryset=User.objects.all(), many=True, required=False
     )
 
+    template = serializers.PrimaryKeyRelatedField(
+        queryset=FormTemplate.objects.all(), required=False, allow_null=True
+    )
+    template_detail = FormTemplateSerializer(
+        source='template', read_only=True
+    )
+
     class Meta:
         model = Service
         fields = [
@@ -608,7 +616,7 @@ class ServiceConfigSerializer(serializers.ModelSerializer):
             'criteria', 'criteria_detail',
             'cutoff_marks',
             'presentation_max_marks',
-            'tech_evaluators', 'presentation_evaluators' #,'is_currently_active','workflow_stages'
+            'tech_evaluators', 'presentation_evaluators','template', 'template_detail', #,'is_currently_active','workflow_stages'
         ]
 
         read_only_fields = [

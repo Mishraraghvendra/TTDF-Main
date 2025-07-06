@@ -28,3 +28,4 @@ urlpatterns = [
     path('upload-document/', DocumentUploadAPIView.as_view(), name='upload-document'),
     path('refresh-stats/', RefreshStatsAPIView.as_view(), name='refresh-stats'),
 ]
+

@@ -2,7 +2,7 @@
 from django.db import models
 from django.conf import settings
 import uuid
-from dynamic_form.models import FormSubmission
+from dynamic_form.models import FormSubmission,FormTemplate
 from django.utils import timezone
 from django.db.models.signals import pre_save
 from django.dispatch import receiver
@@ -80,6 +80,13 @@ class Service(models.Model):
     )
     passing_requirement = models.ForeignKey(
         'app_eval.PassingRequirement',
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='services'
+    )
+
+    template = models.ForeignKey(
+        FormTemplate,
         null=True, blank=True,
         on_delete=models.SET_NULL,
         related_name='services'
