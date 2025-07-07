@@ -1,8 +1,14 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.core.mail import send_mail
-from dynamic_form.models import ApplicationStatusHistory  # Adjust the import path as needed
+from dynamic_form.models import ApplicationStatusHistory  
 from notifications.utils import send_notification
+from django.conf import settings
+from configuration.models import Service 
+from django.contrib.auth import get_user_model
+User = get_user_model()
+
+
 
 @receiver(post_save, sender=ApplicationStatusHistory)
 def notify_on_status_change(sender, instance, created, **kwargs):
@@ -35,3 +41,18 @@ def notify_on_status_change(sender, instance, created, **kwargs):
             message=message,
             notification_type='status_update'
         )
+
+
+@receiver(post_save, sender=Service)
+def notify_on_service_creation(sender, instance, created, **kwargs):
+    if created:
+        target_roles = ["Admin", "User", "Evaluator"]
+        notified_users = User.objects.filter(
+            roles__name__in=target_roles
+        ).distinct()
+        for user in notified_users:
+            send_notification(
+                recipient=user,
+                message=f'A new service "{instance.name}" has been created.',
+                notification_type="service_created"
+            )

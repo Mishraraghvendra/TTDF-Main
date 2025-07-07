@@ -13,6 +13,7 @@ from django.db.models import Q, Prefetch
 import time
 import logging
 from rest_framework.views import APIView
+from notifications.utils import send_notification
 
 from .models import TechnicalEvaluationRound, EvaluatorAssignment, CriteriaEvaluation
 from .serializers import (
@@ -441,6 +442,13 @@ class TechnicalEvaluationRoundViewSet(viewsets.ModelViewSet):
             evaluation_round.assigned_by = request.user
             evaluation_round.save()
             
+            for evaluator in evaluators:
+                send_notification(
+                    recipient=evaluator,
+                    message=f'You have been assigned to evaluate proposal {evaluation_round.proposal.proposal_id}.',
+                    notification_type="evaluator_assignment"
+                )
+
             # The signals will automatically update cached values
             
             elapsed = time.time() - start_time
@@ -754,6 +762,28 @@ class EvaluatorAssignmentViewSet(viewsets.ModelViewSet):
             assignment.is_completed = True
             assignment.completed_at = timezone.now()
             assignment.save()
+
+
+            # Notify Applicant
+            if applicant:
+                send_notification(
+                    recipient=applicant,
+                    message=f'Your proposal ({getattr(proposal, "proposal_id", "N/A")}) has been evaluated by {request.user.get_full_name()}.',
+                    notification_type="proposal_evaluated"
+                )
+
+            # Notify Admins (all admins; customize as needed)
+            
+            admin_and_user_role_users = User.objects.filter(
+            roles__name__in=["Admin"]
+            ).exclude(id=applicant.id).distinct()
+
+            for user in admin_and_user_role_users:
+                send_notification(
+                    recipient=user,
+                    message=f'Proposal ({getattr(proposal, "proposal_id", "N/A")}) has been evaluated by {request.user.get_full_name()}.',
+                    notification_type="proposal_evaluated_role"
+                )
             
             # Signals will automatically update cached values
             

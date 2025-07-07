@@ -4,6 +4,7 @@ from .models import Profile
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
+import json
 
 def upsert_profile_and_user_from_submission(user, data, files=None):
     """
@@ -11,9 +12,9 @@ def upsert_profile_and_user_from_submission(user, data, files=None):
     Accepts both standard and file data (for e.g. images/resume uploads).
     """
 
-    # --- user update logic (unchanged)
     profile, _ = Profile.objects.get_or_create(user=user)
 
+    # --- User fields
     user_fields = ["full_name", "gender", "mobile", "email", "organization"]
     user_updated = False
     for field in user_fields:
@@ -27,6 +28,7 @@ def upsert_profile_and_user_from_submission(user, data, files=None):
     # --- define profile_map here
     profile_map = {
         "applicantPhoto": "profile_image",
+        "profile_image": "profile_image",   # <--- Add this line!
         "qualification": "qualification",
         "resume": "resume",
         "officialEmail": "applicant_official_email",
@@ -52,8 +54,14 @@ def upsert_profile_and_user_from_submission(user, data, files=None):
         # add more mappings as needed
     }
 
-    # --- updated profile handling to accept nested 'profile'
+    # --- updated profile handling to accept nested 'profile' as dict or string
     profile_data = data.get("profile", {})
+    # If profile_data is a string (e.g., sent as JSON via curl -F), parse it
+    if isinstance(profile_data, str):
+        try:
+            profile_data = json.loads(profile_data)
+        except json.JSONDecodeError:
+            profile_data = {}
 
     for form_field, profile_field in profile_map.items():
         value = None

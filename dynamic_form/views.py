@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 from .models import FormTemplate, FormSubmission
 from .serializers import FormSubmissionSerializer,FormTemplateSerializer
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from rest_framework.decorators import action
 
@@ -211,6 +212,7 @@ class FormSubmissionViewSet(viewsets.ModelViewSet):
     queryset = FormSubmission.objects.all().select_related('template', 'applicant')
     serializer_class = FormSubmissionSerializer
     permission_classes = [IsAuthenticated]
+    # authentication_classes = [JWTAuthentication]
     lookup_field = 'pk'
 
     def get_queryset(self):

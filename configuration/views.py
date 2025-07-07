@@ -22,7 +22,7 @@ from .serializers import (
     ApplicationStageProgressSerializer
 )
 from rest_framework.generics import ListAPIView 
-
+from notifications.utils import send_notification
 User = get_user_model()
 
 # Custom permissions
@@ -88,9 +88,6 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(request.user)
         return Response(serializer.data)
  
-
-# views.py
-
 # Updated
 
 class ServiceViewSet(viewsets.ModelViewSet):
@@ -1329,14 +1326,16 @@ class CriteriaListAPIView(APIView):
 
 # configuration/views.py
 
+# views.py
+
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.db import transaction
+from django.core.exceptions import ValidationError
 from .models import Service, ScreeningCommittee
 from .serializers import ServiceConfigSerializer
 from app_eval.models import EvaluationCutoff
-from django.core.exceptions import ValidationError
 
 class ServiceConfigViewSet(viewsets.ModelViewSet):
     queryset = Service.objects.all().prefetch_related('evaluation_items')
@@ -1363,10 +1362,8 @@ class ServiceConfigViewSet(viewsets.ModelViewSet):
                 req.save()
                 return req
             elif update:
-                # ID provided but not found: do not create a new one on update!
                 return None
         elif update:
-            # No ID provided, and we're updating: try to use the existing one attached to the service
             if service and getattr(service, "passing_requirement", None):
                 req = service.passing_requirement
                 for f in [
@@ -1377,35 +1374,25 @@ class ServiceConfigViewSet(viewsets.ModelViewSet):
                         setattr(req, f, passing_req_data[f])
                 req.save()
                 return req
-            # No id and no existing: do not create a new one!
             return None
         else:
-            # Only create if it's a new service
             if not passing_req_data.get('requirement_name') and service:
                 passing_req_data['requirement_name'] = f"{service.name} Passing Config"
             req = PassingRequirement.objects.create(**passing_req_data)
             return req
         return None
 
-
-
     def _get_committee(self, committee_data, committee_type, service, user):
-        """
-        Handles both existing (ID) and new (dict) committee assignments.
-        Returns the ScreeningCommittee instance or None.
-        """
         if not committee_data:
             return None
         if isinstance(committee_data, int) or (isinstance(committee_data, str) and committee_data.isdigit()):
-            # Existing committee by ID
             committee = ScreeningCommittee.objects.filter(id=committee_data, committee_type=committee_type).first()
             if committee:
                 committee.service = service
-                committee.committee_type = committee_type  # Defensive
+                committee.committee_type = committee_type
                 committee.save()
             return committee
         elif isinstance(committee_data, dict):
-            # New committee by data
             return ScreeningCommittee.objects.create(
                 name=committee_data.get('name'),
                 committee_type=committee_type,
@@ -1423,11 +1410,49 @@ class ServiceConfigViewSet(viewsets.ModelViewSet):
                 tech_committee_data = data.pop('tech_committee', None)
                 for k in ['is_active', 'is_currently_active']:
                     data.pop(k, None)
-                # Do NOT pop or remove 'template'
+
+                # DO NOT pop/remove 'template'
                 serializer = self.get_serializer(data=data)
                 serializer.is_valid(raise_exception=True)
                 service = serializer.save(created_by=user)
-                # ... rest of your logic (committees, passing_req, evaluation_items, etc.) ...
+
+                admin_committee = self._get_committee(admin_committee_data, 'administrative', service, user)
+                tech_committee = self._get_committee(tech_committee_data, 'technical', service, user)
+
+                passing_req = self._get_or_create_passing_requirement(request.data, service=service, user=user)
+                if passing_req:
+                    service.passing_requirement = passing_req
+                    service.save(update_fields=['passing_requirement'])
+
+                evaluation_items = request.data.get('evaluation_items', [])
+                if evaluation_items:
+                    service.evaluation_items.set(evaluation_items)
+
+                cutoff_marks = request.data.get('cutoff_marks')
+                if cutoff_marks is not None:
+                    EvaluationCutoff.objects.update_or_create(
+                        service=service,
+                        defaults={'cutoff_marks': cutoff_marks, 'created_by': user}
+                    )
+
+                presentation_max_marks = request.data.get('presentation_max_marks')
+                if presentation_max_marks is not None and hasattr(service, 'presentation_max_marks'):
+                    setattr(service, 'presentation_max_marks', presentation_max_marks)
+                    service.save(update_fields=['presentation_max_marks'])
+
+
+                target_roles = ["Admin", "User", "Evaluator"]
+                notified_users = User.objects.filter(
+                    roles__name__in=target_roles
+                ).distinct()
+                for notify_user in notified_users:
+                    send_notification(
+                        recipient=notify_user,
+                        message=f'A new service "{service.name}" has been created.',
+                        notification_type="service_created"
+                    )
+
+
                 response_serializer = self.get_serializer(service)
                 return Response(
                     {
@@ -1453,11 +1478,35 @@ class ServiceConfigViewSet(viewsets.ModelViewSet):
                 tech_committee_data = data.pop('tech_committee', None)
                 for k in ['is_active', 'is_currently_active']:
                     data.pop(k, None)
-                # Again, do NOT pop or remove 'template'
+                # DO NOT pop/remove 'template'
                 serializer = self.get_serializer(instance, data=data, partial=partial)
                 serializer.is_valid(raise_exception=True)
                 service = serializer.save()
-                # ... rest as before ...
+
+                admin_committee = self._get_committee(admin_committee_data, 'administrative', service, user)
+                tech_committee = self._get_committee(tech_committee_data, 'technical', service, user)
+
+                passing_req = self._get_or_create_passing_requirement(request.data, service=service, user=user, update=True)
+                if passing_req:
+                    service.passing_requirement = passing_req
+                    service.save(update_fields=['passing_requirement'])
+
+                evaluation_items = request.data.get('evaluation_items', [])
+                if evaluation_items:
+                    service.evaluation_items.set(evaluation_items)
+
+                cutoff_marks = request.data.get('cutoff_marks')
+                if cutoff_marks is not None:
+                    EvaluationCutoff.objects.update_or_create(
+                        service=service,
+                        defaults={'cutoff_marks': cutoff_marks, 'created_by': user}
+                    )
+
+                presentation_max_marks = request.data.get('presentation_max_marks')
+                if presentation_max_marks is not None and hasattr(service, 'presentation_max_marks'):
+                    setattr(service, 'presentation_max_marks', presentation_max_marks)
+                    service.save(update_fields=['presentation_max_marks'])
+
                 response_serializer = self.get_serializer(service)
                 return Response(
                     {
@@ -1471,8 +1520,6 @@ class ServiceConfigViewSet(viewsets.ModelViewSet):
                 {"message": f"Failed to update Service: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-   
-
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
