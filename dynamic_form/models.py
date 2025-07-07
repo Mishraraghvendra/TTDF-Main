@@ -271,6 +271,28 @@ class FormSubmission(models.Model):
     )
 
 
+    # --- Budget Estimate Section ---
+    budget_estimate = models.JSONField(
+        blank=True,
+        null=True,
+        default=dict,
+        help_text="Nested budget: {'tables':[{'id':'','title':'','serviceOfferings':[{'id':'','name':'','items':[{'id':'','description':'','financials':{'capex':{'year0':{...}},'opex':{'year1':{...}}}}]}]}]}"
+    )
+    
+
+    # --- Income Estimate Section ---
+    income_estimate = models.JSONField(
+        blank=True,
+        null=True,
+        default=dict,
+        help_text=(
+            "Nested income estimate: "
+            "{'rows':[{'id':'','serviceOffering':'','year1':{'estimatedTransactions':'','userCharge':'','estimatedRevenue':''},'year2':{'estimatedTransactions':'','userCharge':'','estimatedRevenue':''}}]}"
+        )
+    )
+
+
+
     # --- Proposal Cost Breakdown Section ---
 
     network_core = models.JSONField(blank=True,null=True,default=dict,

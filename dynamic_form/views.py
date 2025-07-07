@@ -208,7 +208,7 @@ def save_milestones_for_submission(form_submission, milestones_data, user=None):
 
 
 
-import json
+
 
 class FormSubmissionViewSet(viewsets.ModelViewSet):
     queryset = FormSubmission.objects.all().select_related('template', 'applicant')
