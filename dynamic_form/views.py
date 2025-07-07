@@ -8,7 +8,7 @@ from .serializers import FormSubmissionSerializer,FormTemplateSerializer
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from rest_framework.decorators import action
-
+import json
 from screening.serializers import (
     ScreeningRecordSerializer,
     TechnicalScreeningRecordSerializer
@@ -22,7 +22,7 @@ from django.db import transaction
 from configuration.models import ScreeningCommittee
 from milestones.models import Milestone
 from users.utils import upsert_profile_and_user_from_submission
-
+import json
 
 class FormTemplateViewSet(viewsets.ReadOnlyModelViewSet):
     """
@@ -208,11 +208,12 @@ def save_milestones_for_submission(form_submission, milestones_data, user=None):
 
 
 
-class FormSubmissionViewSet(viewsets.ModelViewSet): 
+import json
+
+class FormSubmissionViewSet(viewsets.ModelViewSet):
     queryset = FormSubmission.objects.all().select_related('template', 'applicant')
     serializer_class = FormSubmissionSerializer
     permission_classes = [IsAuthenticated]
-    # authentication_classes = [JWTAuthentication]
     lookup_field = 'pk'
 
     def get_queryset(self):
@@ -220,11 +221,12 @@ class FormSubmissionViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
-        data = request.data.copy()
+        # Use request.data for normal fields, request.FILES for file fields
+        data = request.data.copy()  # This is OK for QueryDict, as long as you don't deepcopy files!
         data.setdefault('status', FormSubmission.DRAFT)
-        
-        upsert_profile_and_user_from_submission(request.user, data, files=request.FILES)
 
+        # Handle user/profile upsert (see code below for safe file logic)
+        upsert_profile_and_user_from_submission(request.user, data, files=request.FILES)
 
         serializer = self.get_serializer(data=data)
         try:
@@ -235,19 +237,17 @@ class FormSubmissionViewSet(viewsets.ModelViewSet):
                 {"success": False, "message": "Could not save submission.", "errors": serializer.errors},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-            
-        milestones = request.data.get("milestones")
-        if milestones and isinstance(milestones, list):
-            save_milestones_for_submission(submission, milestones, request.user)
 
-        msg = "Saved as draft." if serializer.data.get('status') == FormSubmission.DRAFT else "Submitted successfully."
-
-        # ---- THIS IS THE KEY PART ----
-        resp_data = serializer.data.copy()
-        
-        resp_data['form_id'] = submission.form_id
-        # ---- END KEY PART ----
+        milestones = request.data.get("milestones")        
+        if milestones:
+            if isinstance(milestones, str):
+                try:
+                    milestones = json.loads(milestones)
+                except Exception as e:
+                    print("Could not parse milestones:", e)
+                    milestones = []
+            if isinstance(milestones, list):
+                save_milestones_for_submission(submission, milestones, request.user)
 
         return Response(
             {
@@ -272,10 +272,11 @@ class FormSubmissionViewSet(viewsets.ModelViewSet):
                 {"success": False, "message": "Cannot edit a finalized submission."},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
         data = request.data.copy()
         upsert_profile_and_user_from_submission(request.user, data, files=request.FILES)
 
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer = self.get_serializer(instance, data=data, partial=partial)
         try:
             serializer.is_valid(raise_exception=True)
             submission = serializer.save()
@@ -284,21 +285,17 @@ class FormSubmissionViewSet(viewsets.ModelViewSet):
                 {"success": False, "message": "Could not update submission.", "errors": serializer.errors},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
 
         milestones = request.data.get("milestones")
-        if milestones and isinstance(milestones, list):
-            instance.milestones.all().delete()
-            save_milestones_for_submission(submission, milestones, request.user)
-
-        msg = "Saved as draft." if serializer.data.get('status') == FormSubmission.DRAFT else "Submitted successfully."
-        resp_data = serializer.data.copy()
-        
-        resp_data['form_id'] = submission.form_id
-
-
-
-
+        if milestones:
+            if isinstance(milestones, str):
+                try:
+                    milestones = json.loads(milestones)
+                except Exception as e:
+                    print("Could not parse milestones:", e)
+                    milestones = []
+            if isinstance(milestones, list):
+                save_milestones_for_submission(submission, milestones, request.user)
 
         return Response(
             {
@@ -308,6 +305,9 @@ class FormSubmissionViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_200_OK
         )
+
+
+
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
