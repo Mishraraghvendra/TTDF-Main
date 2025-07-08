@@ -382,6 +382,19 @@ class FormSubmission(models.Model):
         null=True
     )
 
+    presentation = models.FileField(
+            upload_to=partial(upload_to_dynamic, subfolder="Presentation"),
+            blank=True,
+            null=True
+        )
+    
+    dpr = models.FileField(
+            upload_to=partial(upload_to_dynamic, subfolder="DPR"),
+            blank=True,
+            null=True
+        )
+
+
 ###################################################################################################################################################
   
  # ———For All Old Calls (Befour 5G Inteligent Village)  —————————————————
