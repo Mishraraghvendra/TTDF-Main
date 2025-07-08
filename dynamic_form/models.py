@@ -115,6 +115,7 @@ class FormSubmission(models.Model):
     subject           = models.CharField(max_length=255,blank=True, null=True)
     org_type          = models.CharField(max_length=255,blank=True, null=True)
     description       = models.CharField(max_length=255,blank=True, null=True)
+    org_mobile                      = models.CharField(max_length=15,blank=True, null=True)
 
     # ———2. Collaborator Details ————————
     collaborator_name  = models.CharField(max_length=200,blank=True, null=True)
