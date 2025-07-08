@@ -104,6 +104,7 @@ class FormSubmission(models.Model):
     updated_at   = models.DateTimeField(auto_now=True)
     committee_assigned = models.BooleanField(default=False)
     current_trl            = models.PositiveIntegerField(null=True,blank=True,help_text="Can be filled later")
+    grants_from_ttdf           = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
 
     # ——— 1. Basic Information ——————————————————
     individual_pan    = models.CharField(max_length=20,blank=True, null=True)
