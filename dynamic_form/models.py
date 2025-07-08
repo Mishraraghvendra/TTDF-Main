@@ -80,12 +80,14 @@ class FormSubmission(models.Model):
         on_delete=models.PROTECT,
         related_name='submissions'
     )
+
     service      = models.ForeignKey(
         'configuration.Service',
         on_delete=models.PROTECT,
         related_name='form_submissions',
     null=True, blank=True
     )
+
     applicant    = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -103,8 +105,7 @@ class FormSubmission(models.Model):
     created_at   = models.DateTimeField(auto_now_add=True)
     updated_at   = models.DateTimeField(auto_now=True)
     committee_assigned = models.BooleanField(default=False)
-    current_trl            = models.PositiveIntegerField(null=True,blank=True,help_text="Can be filled later")
-    grants_from_ttdf           = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    
 
     # ——— 1. Basic Information ——————————————————
     individual_pan    = models.CharField(max_length=20,blank=True, null=True)
@@ -115,7 +116,7 @@ class FormSubmission(models.Model):
     subject           = models.CharField(max_length=255,blank=True, null=True)
     org_type          = models.CharField(max_length=255,blank=True, null=True)
     description       = models.CharField(max_length=255,blank=True, null=True)
-    org_mobile                      = models.CharField(max_length=15,blank=True, null=True)
+    
 
     # ———2. Collaborator Details ————————
     collaborator_name  = models.CharField(max_length=200,blank=True, null=True)
@@ -237,11 +238,13 @@ class FormSubmission(models.Model):
         blank=True,
         null=True
     )
+
     technical_proposal = models.FileField(
         upload_to=partial(upload_to_dynamic, subfolder="technical_proposals"),
         blank=True,
         null=True
     )
+
     proposal_presentation = models.FileField(
         upload_to=partial(upload_to_dynamic, subfolder="proposal_presentations"),
         blank=True,
@@ -290,8 +293,6 @@ class FormSubmission(models.Model):
             "{'rows':[{'id':'','serviceOffering':'','year1':{'estimatedTransactions':'','userCharge':'','estimatedRevenue':''},'year2':{'estimatedTransactions':'','userCharge':'','estimatedRevenue':''}}]}"
         )
     )
-
-
 
     # --- Proposal Cost Breakdown Section ---
 
@@ -381,8 +382,141 @@ class FormSubmission(models.Model):
         null=True
     )
 
-
+###################################################################################################################################################
   
+ # ———For All Old Calls (Befour 5G Inteligent Village)  —————————————————
+
+ # ——— 2. Organization Details —————————————————
+    org_address_line1               = models.CharField(max_length=255,blank=True, null=True)
+    org_address_line2               = models.CharField(max_length=255, blank=True)
+    org_street_village              = models.CharField(max_length=255,blank=True, null=True)
+    org_city_town                   = models.CharField(max_length=200,blank=True, null=True)
+    org_state                       = models.CharField(max_length=100,blank=True, null=True)
+    org_pin_code                    = models.CharField(max_length=10,blank=True, null=True)
+    org_landline                    = models.CharField(max_length=20, blank=True, null=True)
+    org_mobile                      = models.CharField(max_length=15,blank=True, null=True)
+    org_official_email              = models.EmailField(blank=True, null=True)
+    org_website                     = models.URLField(blank=True, null=True)
+    org_shares_51pct_indian_citizens= models.CharField(max_length=3, choices=YES_NO_CHOICES,blank=True, null=True)
+    org_tan_pan_cin_file            = models.FileField(upload_to='org_docs/',blank=True, null=True)
+    org_registration_certificate    = models.FileField(upload_to='org_docs/',blank=True, null=True)
+    org_approval_certificate        = models.FileField(upload_to='org_docs/',blank=True, null=True)
+    org_registration_certificate_2  = models.FileField(upload_to='org_docs/', blank=True, null=True)
+    org_annual_report               = models.FileField(upload_to='org_docs/', blank=True, null=True)
+    org_industry_auth_letter        = models.FileField(upload_to='org_docs/', blank=True, null=True)
+    org_shareholding_pattern_file   = models.FileField(upload_to='org_docs/', blank=True, null=True)
+
+    # ——— 3. Proposal Summary ——————————————————
+    current_trl            = models.PositiveIntegerField(null=True,blank=True,help_text="Can be filled later")
+    # expected_trl           = models.PositiveIntegerField(null=True,blank=True,help_text="Can be filled later")
+    abstract               = models.TextField(blank=True, null=True)
+    novelty                = models.TextField(blank=True, null=True)
+    technical_feasibility  = models.TextField(blank=True, null=True)
+    potential_impact       = models.TextField(blank=True, null=True)
+    end_to_end_solution    = models.TextField(blank=True, null=True)
+    cyber_security         = models.TextField(help_text="Write 'NA' if none",blank=True, null=True)
+    commercialization_strategy = models.TextField(blank=True, null=True)
+    support_required            = models.TextField(blank=True, null=True)
+    alternate_technology_info    = models.TextField(blank=True, null=True)
+
+    # ——— 4. RD Staff & Equipment (variable rows) ——
+    rd_staff           = models.JSONField(help_text="List of RD staff entries: …",blank=True, null=True, default=list)
+    equipment          = models.JSONField(help_text="List of equipment entries: …",blank=True, null=True, default=list)
+    proposal_info      = models.TextField(blank=True, null=True)  # static free-form answers
+
+    # ——— 5. Collaborator Details ————————
+    collaborator_name  = models.CharField(max_length=200,blank=True, null=True)
+    collaborator_type  = models.CharField(max_length=50,blank=True, null=True)
+    collaborator_mou   = models.FileField(upload_to='mou/',blank=True, null=True)
+    consortiumPartner =  models.CharField(max_length=200,blank=True, null=True)
+
+    # ——— 6. Finance Details —————————
+    finance_outstanding_loan    = models.CharField(max_length=3, choices=YES_NO_CHOICES,blank=True, null=True)
+    finance_gov_t_funding       = models.CharField(max_length=3, choices=YES_NO_CHOICES,blank=True, null=True)
+    bank_name                   = models.CharField(max_length=200,blank=True, null=True)
+    bank_branch                 = models.CharField(max_length=200,blank=True, null=True)
+    account_type                = models.CharField(max_length=50,blank=True, null=True)
+    bank_account_number         = models.CharField(max_length=30,blank=True, null=True)
+    ifsc_code                   = models.CharField(max_length=20,blank=True, null=True)
+    expected_source_contribution = models.DecimalField(max_digits=12, decimal_places=2,blank=True, null=True)
+    details_source_funding = models.DecimalField(max_digits=12, decimal_places=2,blank=True, null=True)
+
+    
+    # ——— 7. Highlight Proposal ——————
+    significance_impact      = models.TextField(blank=True, null=True)
+    rationale                = models.TextField(blank=True, null=True)
+    inventive_step           = models.TextField(blank=True, null=True)
+    national_importance      = models.TextField(blank=True, null=True)
+    commercialization_potential = models.TextField(blank=True, null=True)
+    potential_competitors    = models.TextField(blank=True, null=True)
+    risk_factors             = models.TextField(blank=True, null=True)
+    preliminary_work_done    = models.TextField(blank=True, null=True)
+    technology_status        = models.TextField(blank=True, null=True)
+    business_strategy        = models.TextField(blank=True, null=True)
+
+    # ——— 8. IPR Details —————————
+    ipr_dot_related                  = models.TextField(blank=True, null=True)
+    ipr_based_on_ip                  = models.TextField(blank=True, null=True)
+    ipr_ownership_details            = models.TextField(blank=True, null=True)
+    ipr_proposal_details             = models.TextField(blank=True, null=True)
+    ipr_potential_impact             = models.TextField(blank=True, null=True)
+    ipr_patent_file                  = models.FileField(upload_to='ipr/', blank=True, null=True)
+    ipr_registered_no                = models.CharField(max_length=50, blank=True)
+    ipr_background_details           = models.TextField(blank=True, null=True)
+    ipr_generate_new_ip              = models.CharField(max_length=3, choices=YES_NO_CHOICES,blank=True, null=True)
+    ipr_countries_jurisdiction       = models.TextField(blank=True, null=True)
+    ipr_licensed_regulatory_approvals= models.TextField(blank=True, null=True)
+    ipr_status_approvals             = models.TextField(blank=True, null=True)
+    ipr_status_approval_proof        = models.TextField(blank=True, null=True)
+    ipr_previous_submission          = models.CharField(max_length=3, choices=YES_NO_CHOICES,blank=True, null=True)
+    ipr_regulatory_info              = models.CharField(max_length=3, choices=YES_NO_CHOICES,blank=True, null=True)
+    ipr_incubation                   = models.CharField(max_length=3, choices=YES_NO_CHOICES,blank=True, null=True)
+    ipr_approval_details             = models.TextField(blank=True, null=True)
+    ipr_architecture_chart           = models.FileField(upload_to='ipr/', blank=True, null=True)
+
+    # ——— 9. Patents ——————————
+    patent_number   = models.CharField(max_length=50, blank=True, null=True)
+    patent_title    = models.CharField(max_length=200, blank=True, null=True)
+
+    # ——— 10. Manpower Details ——————
+    manpower_job_title         = models.CharField(max_length=200, blank=True, null=True)
+    manpower_min_qualification = models.CharField(max_length=200, blank=True, null=True)
+    manpower_experience_years  = models.PositiveIntegerField(null=True, blank=True)
+    manpower_role              = models.CharField(max_length=200, blank=True, null=True)
+    manpower_positions         = models.PositiveIntegerField(null=True, blank=True)
+    manpower_duration_months   = models.PositiveIntegerField(null=True, blank=True)
+    manpower_proposed_salary   = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    manpower_total_cost        = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+
+    # ——— 11. Other Requirements ——————
+    other_req_items            = models.JSONField(help_text="List of items: …",blank=True, null=True, default=list)
+
+    # ——— 12. Capital Expenditure ——————
+    capex_items                = models.JSONField(help_text="List of capex: …",blank=True, null=True, default=list)
+
+    # ——— 13. Finance Budget ——————
+    budget_other_source_desc   = models.TextField(blank=True, null=True)
+    budget_amount_1            = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    budget_other_source_2_desc = models.TextField(blank=True, null=True)
+    budget_amount_2            = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+
+    # ——— 14. Activities & Timelines ——————
+    scope_of_work              = models.TextField(blank=True, null=True)
+    time_required_months       = models.PositiveIntegerField(null=True, blank=True)
+    activities                 = models.TextField(blank=True, null=True)
+    applicant_contribution     = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    grants_from_ttdf           = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+
+    # ——— 15. Declaration ——————
+    declaration_document       = models.FileField(upload_to='declarations/',blank=True, null=True)
+    declaration_1              = models.BooleanField(default=False)
+    declaration_2              = models.BooleanField(default=False)
+    declaration_3              = models.BooleanField(default=False)
+    declaration_4              = models.BooleanField(default=False)
+    declaration_5              = models.BooleanField(default=False)
+
+
+####################################################################################################################################################
    
 
     def generate_form_id(self):
