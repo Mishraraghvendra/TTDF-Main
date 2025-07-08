@@ -6,9 +6,6 @@ from django.conf import settings
 from .utils.pdf_generator import generate_submission_pdf
 from functools import partial
 
-
-
-
 YES_NO_CHOICES = [
     ('yes','Yes'),
     ('no','No'),
@@ -106,6 +103,7 @@ class FormSubmission(models.Model):
     created_at   = models.DateTimeField(auto_now_add=True)
     updated_at   = models.DateTimeField(auto_now=True)
     committee_assigned = models.BooleanField(default=False)
+    current_trl            = models.PositiveIntegerField(null=True,blank=True,help_text="Can be filled later")
 
     # ——— 1. Basic Information ——————————————————
     individual_pan    = models.CharField(max_length=20,blank=True, null=True)
