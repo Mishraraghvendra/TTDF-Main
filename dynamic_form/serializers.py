@@ -122,8 +122,64 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
         for field in json_fields:
             field_data = []
             
-            # Check if we have indexed array fields like collaborators[0][field_name]
-            if hasattr(data, 'keys'):
+            # NEW: Check for array values (multiple files with same field name)
+            if hasattr(data, 'getlist'):
+                array_values = data.getlist(field)
+                
+                # Handle multiple files with same field name (e.g., fund_loan_documents)
+                if array_values and len(array_values) > 0:
+                    # Check if these are file objects
+                    if all(hasattr(value, 'read') and hasattr(value, 'name') for value in array_values if value):
+                        # Special handling for fund_loan_documents (file-only model)
+                        if field == 'fund_loan_documents':
+                            field_data = [{'document': file} for file in array_values if file]
+                            print(f"✅ {field}: Found {len(field_data)} files as array (no indexing)")
+                        elif field == 'rdstaff':
+                            # For rdstaff, if files are uploaded via array, create basic structure
+                            field_data = [{'resume': file} for file in array_values if file]
+                            print(f"✅ {field}: Found {len(field_data)} resume files as array")
+                        elif field == 'shareholders':
+                            field_data = [{'identity_document': file} for file in array_values if file]
+                            print(f"✅ {field}: Found {len(field_data)} identity documents as array")
+                        elif field == 'sub_shareholders':
+                            field_data = [{'identity_document': file} for file in array_values if file]
+                            print(f"✅ {field}: Found {len(field_data)} sub-shareholder documents as array")
+                        elif field == 'collaborators':
+                            field_data = [{'pan_file_collb': file} for file in array_values if file]
+                            print(f"✅ {field}: Found {len(field_data)} collaborator files as array")
+                        elif field == 'iprdetails':
+                            field_data = [{'t_support_letter': file} for file in array_values if file]
+                            print(f"✅ {field}: Found {len(field_data)} support letters as array")
+                        else:
+                            # Generic file handling
+                            field_data = [{'file_field': file} for file in array_values if file]
+                            print(f"✅ {field}: Found {len(field_data)} files as array")
+                    
+                    # Handle JSON string arrays
+                    elif len(array_values) == 1 and isinstance(array_values[0], str):
+                        try:
+                            field_data = json.loads(array_values[0])
+                            print(f"✅ {field}: Parsed from JSON string -> {len(field_data)} items")
+                        except (json.JSONDecodeError, ValueError) as e:
+                            print(f"❌ {field}: JSON parse failed: {e}")
+                            field_data = []
+                    
+                    # Handle multiple JSON strings
+                    elif all(isinstance(value, str) for value in array_values):
+                        for value in array_values:
+                            try:
+                                parsed_item = json.loads(value)
+                                if isinstance(parsed_item, list):
+                                    field_data.extend(parsed_item)
+                                else:
+                                    field_data.append(parsed_item)
+                            except (json.JSONDecodeError, ValueError):
+                                # If not JSON, treat as simple string data
+                                field_data.append({'value': value})
+                        print(f"✅ {field}: Parsed multiple JSON strings -> {len(field_data)} items")
+            
+            # If no array values found, check for indexed array fields
+            if not field_data and hasattr(data, 'keys'):
                 # Collect all keys that start with this field name
                 field_keys = [key for key in data.keys() if key.startswith(f"{field}[")]
                 
@@ -166,36 +222,36 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
                         field_data.append(indexed_items[i])
                     
                     print(f"✅ {field}: Parsed {len(field_data)} items from indexed fields")
-                    
-                else:
-                    # Check if it's a JSON string or list
-                    value = data.get(field)
-                    if value is not None:
-                        if isinstance(value, str):
-                            try:
-                                field_data = json.loads(value)
-                                print(f"✅ {field}: Parsed from JSON string -> {len(field_data)} items")
-                            except (json.JSONDecodeError, ValueError) as e:
-                                print(f"❌ {field}: JSON parse failed: {e}")
-                                field_data = []
-                        elif isinstance(value, list):
-                            # Handle list that might contain JSON strings
-                            if len(value) == 1 and isinstance(value[0], str):
-                                try:
-                                    field_data = json.loads(value[0])
-                                    print(f"✅ {field}: Parsed from list[str] -> {len(field_data)} items")
-                                except (json.JSONDecodeError, ValueError) as e:
-                                    print(f"❌ {field}: List parse failed: {e}")
-                                    field_data = []
-                            else:
-                                field_data = value
-                                print(f"✅ {field}: Already a list -> {len(field_data)} items")
-                        else:
-                            print(f"❌ {field}: Unexpected type {type(value)}")
+            
+            # If still no data, check for single JSON string or list
+            if not field_data:
+                value = data.get(field)
+                if value is not None:
+                    if isinstance(value, str):
+                        try:
+                            field_data = json.loads(value)
+                            print(f"✅ {field}: Parsed from JSON string -> {len(field_data)} items")
+                        except (json.JSONDecodeError, ValueError) as e:
+                            print(f"❌ {field}: JSON parse failed: {e}")
                             field_data = []
+                    elif isinstance(value, list):
+                        # Handle list that might contain JSON strings
+                        if len(value) == 1 and isinstance(value[0], str):
+                            try:
+                                field_data = json.loads(value[0])
+                                print(f"✅ {field}: Parsed from list[str] -> {len(field_data)} items")
+                            except (json.JSONDecodeError, ValueError) as e:
+                                print(f"❌ {field}: List parse failed: {e}")
+                                field_data = []
+                        else:
+                            field_data = value
+                            print(f"✅ {field}: Already a list -> {len(field_data)} items")
                     else:
+                        print(f"❌ {field}: Unexpected type {type(value)}")
                         field_data = []
-                        print(f"ℹ️ {field}: No data found, using empty list")
+                else:
+                    field_data = []
+                    print(f"ℹ️ {field}: No data found, using empty list")
             
             # Store the processed array data - this will be accessed later in create/update
             # Don't add it to the main data dict to avoid validation issues
@@ -317,7 +373,7 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
         # Create main submission
         submission = super().create(validated_data)
 
-        # Inject file objects
+        # Inject file objects for indexed uploads (files referenced by name)
         self._inject_file_objects(fund_loan_documents, ['document'])
         self._inject_file_objects(iprdetails, ['t_support_letter'])
         self._inject_file_objects(collaborators, ['pan_file_collb', 'mou_file_collab'])

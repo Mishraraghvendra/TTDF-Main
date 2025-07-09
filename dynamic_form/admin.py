@@ -50,11 +50,13 @@ class SubShareHolderInline(admin.TabularInline):
 
 @admin.register(FormSubmission)
 class FormSubmissionAdmin(admin.ModelAdmin):
-    list_display = ('id', 'proposal_id', 'template', 'service', 'applicant', 'status', 'created_at')
+    list_display = (
+        'id', 'proposal_id', 'template', 'service', 'applicant', 'status', 'created_at'
+    )
     readonly_fields = ['form_id', 'proposal_id', 'created_at', 'updated_at']
     search_fields = ['form_id', 'proposal_id', 'subject', 'description']
 
-    # Remove direct fields now handled in new related models!
+    # Register all JSON fields and new file fields
     fieldsets = (
         ("General Info", {
             'fields': (
@@ -70,7 +72,6 @@ class FormSubmissionAdmin(admin.ModelAdmin):
                 'description', 'subject',
             )
         }),
-        # No more Shareholder/Equipment/RD Staff here: handled by inlines!
         ("Fund Details", {
             'fields': (
                 'has_loan', 'fund_loan_description', 'fund_loan_amount',
@@ -97,17 +98,44 @@ class FormSubmissionAdmin(admin.ModelAdmin):
                 'ttdf_applied_before',
             )
         }),
+        # Register new JSON fields here
+        ("Manpower & Other Requirements", {
+            'fields': (
+                'manpower_details',
+                'other_requirements',
+            )
+        }),
+        ("Budget & Income Estimate", {
+            'fields': (
+                'budget_estimate',
+                'income_estimate',
+            )
+        }),
+        ("Proposal Cost Breakdown", {
+            'fields': (
+                'network_core',
+                'radio_access_network',
+                'fixed_wireless_access',
+                'civil_electrical_infrastructure',
+                'centralised_servers_and_edge_analytics',
+                'passive_components',
+                'software_components',
+                'sensor_network_costs',
+                'installation_infrastructure_and_commissioning',
+                'operation_maintenance_and_warranty',
+                'total_proposal_cost',
+            )
+        }),
+        ("Uploads", {
+            'fields': (
+                'presentation',
+                'dpr',
+            )
+        }),
     )
 
-    inlines = [
-        IPRDetailsInline,
-        FundLoanDocumentInline,
-        CollaboratorInline,
-        EquipmentInline,
-        ShareHolderInline,
-        RDStaffInline,
-        SubShareHolderInline,
-    ]
+
+
 
 # Register related models for completeness (optional, can be managed via inline)
 admin.site.register(IPRDetails)

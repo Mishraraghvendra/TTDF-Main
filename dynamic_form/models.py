@@ -24,10 +24,9 @@ APPLICANT_TYPE_CHOICES = [
 ]
 
 Village_CHOICES = [
-    ('delhi 1','Delhi 1 '),
-    ('delhi 2','Delhi 2'),
-    ('delhi 3','Delhi3'),
-    # add more as needed
+    ('ari_umri_mp', 'Ari & Umri (Block Guna, Madhya Pradesh)'),
+    ('narakoduru_ap', 'Narakoduru (Block Chebrolu, Andhra Pradesh)'),
+    ('chaurawala_up', 'Chaurawala (Block Morna, Uttar Pradesh)'),
 ]
 
 class FormTemplate(models.Model):
