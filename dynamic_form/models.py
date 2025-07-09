@@ -118,44 +118,44 @@ class FormSubmission(models.Model):
     description       = models.CharField(max_length=255,blank=True, null=True)
     
 
-    # ———2. Collaborator Details ————————
-    collaborator_name  = models.CharField(max_length=200,blank=True, null=True)
-    collaborator_type  = models.CharField(max_length=50,blank=True, null=True)
-    collaborator_mou   = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="mou"),blank=True, null=True)
-    consortiumPartner =  models.CharField(max_length=200,blank=True, null=True)
+    # # ———2. Collaborator Details ————————
+    # collaborator_name  = models.CharField(max_length=200,blank=True, null=True)
+    # collaborator_type  = models.CharField(max_length=50,blank=True, null=True)
+    # collaborator_mou   = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="mou"),blank=True, null=True)
+    # consortiumPartner =  models.CharField(max_length=200,blank=True, null=True)
     # --- Other Section ---
     ttdf_applied_before = models.CharField(max_length=3, choices=YES_NO_CHOICES, blank=True, null=True)
 
 
     # --- 4 Equipment Section ---
-    equipment_item = models.CharField(max_length=255, blank=True, null=True)
-    equipment_unit_price = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
-    equipment_quantity = models.PositiveIntegerField(blank=True, null=True)
-    equipment_amount = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
-    equipment_contributor_type = models.CharField(max_length=255, blank=True, null=True)
+    # equipment_item = models.CharField(max_length=255, blank=True, null=True)
+    # equipment_unit_price = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+    # equipment_quantity = models.PositiveIntegerField(blank=True, null=True)
+    # equipment_amount = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+    # equipment_contributor_type = models.CharField(max_length=255, blank=True, null=True)
 
     # --- 5.Share Holder Details ---
-    share_holder_name = models.CharField(max_length=255, blank=True, null=True)
-    share_percentage = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
-    identity_document = models.FileField(
-        upload_to=partial(upload_to_dynamic, subfolder="shareholder_docs"),
-        blank=True,
-        null=True
-    )
+    # share_holder_name = models.CharField(max_length=255, blank=True, null=True)
+    # share_percentage = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
+    # identity_document = models.FileField(
+    #     upload_to=partial(upload_to_dynamic, subfolder="shareholder_docs"),
+    #     blank=True,
+    #     null=True
+    # )
 
 
-    # ——— 6. RD Staff & Equipment (variable rows) ——    
-    rd_staff_name = models.CharField(max_length=255, blank=True, null=True)
-    rd_staff_designation = models.CharField(max_length=255, blank=True, null=True)
-    rd_staff_email = models.EmailField(blank=True, null=True)
-    rd_staff_highest_qualification = models.CharField(max_length=255, blank=True, null=True)
-    rd_staff_mobile = models.CharField(max_length=20, blank=True, null=True)
-    rd_staff_resume = models.FileField(
-        upload_to=partial(upload_to_dynamic, subfolder="rd_staff_resumes"),
-        blank=True,
-        null=True
-    )
-    rd_staff_epf_details = models.CharField(max_length=255, blank=True, null=True)
+    # # ——— 6. RD Staff & Equipment (variable rows) ——    
+    # rd_staff_name = models.CharField(max_length=255, blank=True, null=True)
+    # rd_staff_designation = models.CharField(max_length=255, blank=True, null=True)
+    # rd_staff_email = models.EmailField(blank=True, null=True)
+    # rd_staff_highest_qualification = models.CharField(max_length=255, blank=True, null=True)
+    # rd_staff_mobile = models.CharField(max_length=20, blank=True, null=True)
+    # rd_staff_resume = models.FileField(
+    #     upload_to=partial(upload_to_dynamic, subfolder="rd_staff_resumes"),
+    #     blank=True,
+    #     null=True
+    # )
+    # rd_staff_epf_details = models.CharField(max_length=255, blank=True, null=True)
 
 
     # ---7. Fund loan Details Section ---
@@ -164,7 +164,7 @@ class FormSubmission(models.Model):
     )
     fund_loan_description = models.TextField(blank=True, null=True)
     fund_loan_amount = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
-    fund_loan_documents = models.JSONField(blank=True, null=True, default=list, help_text="List of uploaded file paths")
+    # fund_loan_documents = models.JSONField(blank=True, null=True, default=list, help_text="List of uploaded file paths")
 
 
     # ---8. Contribution Details Section ---
@@ -203,33 +203,33 @@ class FormSubmission(models.Model):
     model_village = models.CharField(max_length=255, blank=True, null=True)
 
 
-    # ---12 Essence of Proposal Section ---
-    national_importance = models.TextField(blank=True, null=True)
-    commercialization_potential = models.TextField(blank=True, null=True)
-    risk_factors = models.TextField(blank=True, null=True)
-    preliminary_work_done = models.TextField(blank=True, null=True)
-    technology_status = models.TextField(blank=True, null=True)
-    business_strategy = models.TextField(blank=True, null=True)
+    # # ---12 Essence of Proposal Section ---
+    # national_importance = models.TextField(blank=True, null=True)
+    # commercialization_potential = models.TextField(blank=True, null=True)
+    # risk_factors = models.TextField(blank=True, null=True)
+    # preliminary_work_done = models.TextField(blank=True, null=True)
+    # technology_status = models.TextField(blank=True, null=True)
+    # business_strategy = models.TextField(blank=True, null=True)
 
-    # ---13 IP Regulatory Details Section ---
-    based_on_ipr = models.TextField(blank=True, null=True)
-    ip_ownership_details = models.TextField(blank=True, null=True)
-    ip_proposal = models.TextField(blank=True, null=True)
-    regulatory_approvals = models.TextField(blank=True, null=True)
-    status_approvals = models.TextField(blank=True, null=True)
-    proof_of_status = models.TextField(blank=True, null=True)
+    # # ---13 IP Regulatory Details Section ---
+    # based_on_ipr = models.TextField(blank=True, null=True)
+    # ip_ownership_details = models.TextField(blank=True, null=True)
+    # ip_proposal = models.TextField(blank=True, null=True)
+    # regulatory_approvals = models.TextField(blank=True, null=True)
+    # status_approvals = models.TextField(blank=True, null=True)
+    # proof_of_status = models.TextField(blank=True, null=True)
 
-    # ---14 Telecom Service Provider Section ---
-    tsp_name = models.CharField(max_length=255, blank=True, null=True)
-    tsp_designation = models.CharField(max_length=255, blank=True, null=True)
-    tsp_mobile_number = models.CharField(max_length=20, blank=True, null=True)
-    tsp_email = models.EmailField(blank=True, null=True)
-    tsp_address = models.TextField(blank=True, null=True)
-    tsp_support_letter = models.FileField(
-        upload_to=partial(upload_to_dynamic, subfolder="tsp_support_letters"),
-        blank=True,
-        null=True
-    )
+    # # ---14 Telecom Service Provider Section ---
+    # tsp_name = models.CharField(max_length=255, blank=True, null=True)
+    # tsp_designation = models.CharField(max_length=255, blank=True, null=True)
+    # tsp_mobile_number = models.CharField(max_length=20, blank=True, null=True)
+    # tsp_email = models.EmailField(blank=True, null=True)
+    # tsp_address = models.TextField(blank=True, null=True)
+    # tsp_support_letter = models.FileField(
+    #     upload_to=partial(upload_to_dynamic, subfolder="tsp_support_letters"),
+    #     blank=True,
+    #     null=True
+    # )
 
 
     # --- Architecture And Project Chart Section ---
@@ -438,10 +438,10 @@ class FormSubmission(models.Model):
     proposal_info      = models.TextField(blank=True, null=True)  # static free-form answers
 
     # ——— 5. Collaborator Details ————————
-    collaborator_name  = models.CharField(max_length=200,blank=True, null=True)
-    collaborator_type  = models.CharField(max_length=50,blank=True, null=True)
-    collaborator_mou   = models.FileField(upload_to='mou/',blank=True, null=True)
-    consortiumPartner =  models.CharField(max_length=200,blank=True, null=True)
+    # collaborator_name  = models.CharField(max_length=200,blank=True, null=True)
+    # collaborator_type  = models.CharField(max_length=50,blank=True, null=True)
+    # collaborator_mou   = models.FileField(upload_to='mou/',blank=True, null=True)
+    # consortiumPartner =  models.CharField(max_length=200,blank=True, null=True)
 
     # ——— 6. Finance Details —————————
     finance_outstanding_loan    = models.CharField(max_length=3, choices=YES_NO_CHOICES,blank=True, null=True)
@@ -534,8 +534,8 @@ class FormSubmission(models.Model):
 
     def generate_form_id(self):
         year = datetime.now().year
-        count = FormSubmission.objects.filter(created_at__year=year).count() + 1
-        return f"FORM/{year}/{count:05d}"
+        # Use the last 6 digits of the UUID for uniqueness, or use the whole UUID if you prefer
+        return f"FORM/{year}/{str(self.pk)[-6:].upper()}"
 
     def generate_proposal_id(self):
         year = datetime.now().year
@@ -588,6 +588,108 @@ class FormSubmission(models.Model):
 
     def __str__(self):
         return f"{self.form_id} ({self.get_status_display()})"
+
+class IPRDetails(models.Model):
+    submission = models.ForeignKey(FormSubmission, related_name='iprdetails', on_delete=models.CASCADE)
+    name = models.CharField(max_length=255, help_text="Unique name or label for this form entry",blank=True, null=True)
+
+    # Essence of Proposal
+    national_importance = models.TextField(blank=True, null=True)
+    commercialization_potential = models.TextField(blank=True, null=True)
+    risk_factors = models.TextField(blank=True, null=True)
+    preliminary_work_done = models.TextField(blank=True, null=True)
+    technology_status = models.TextField(blank=True, null=True)
+    business_strategy = models.TextField(blank=True, null=True)
+
+    # IP Regulatory Details
+    based_on_ipr = models.TextField(blank=True, null=True)
+    ip_ownership_details = models.TextField(blank=True, null=True)
+    ip_proposal = models.TextField(blank=True, null=True)
+    regulatory_approvals = models.TextField(blank=True, null=True)
+    status_approvals = models.TextField(blank=True, null=True)
+    proof_of_status = models.TextField(blank=True, null=True)
+
+    # Telecom Service Provider
+    t_name = models.CharField(max_length=255, blank=True, null=True)
+    t_designation = models.CharField(max_length=255, blank=True, null=True)
+    t_mobile_number = models.CharField(max_length=20, blank=True, null=True)
+    t_email = models.EmailField(blank=True, null=True)
+    t_address = models.TextField(blank=True, null=True)
+    t_support_letter = models.FileField(
+        upload_to=partial(upload_to_dynamic, subfolder="support_letters"),
+        blank=True,
+        null=True
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+class FundLoanDocument(models.Model):
+    form_submission = models.ForeignKey(
+        FormSubmission,
+        on_delete=models.CASCADE,
+        related_name="fund_loan_documents"
+    )
+    document = models.FileField(
+        upload_to=partial(upload_to_dynamic, subfolder="resume"),
+        blank=True,
+        null=True
+    )
+    def __str__(self):
+        return self.document.name if self.document else "No file"
+
+TTDF_COMPANY_CHOICES = [
+    ('domestic_company', 'Domestic Company(ies) with focus on telecom R&D, Use case development'),
+    ('startup_msme', 'Startups / MSMEs'),
+    ('academic', 'Academic institutions'),
+    ('rnd_section8_govt', 'R&D institutions, Section 8 companies / Societies, Central & State government entities / PSUs /Autonomous Bodies/SPVs / Limited liability partnerships'),
+]
+
+class Collaborator(models.Model):
+    form_submission = models.ForeignKey(FormSubmission, related_name="collaborators", on_delete=models.CASCADE)
+    contact_person_name_collab = models.CharField(max_length=200, blank=True, null=True)
+    organization_name_collab = models.CharField(max_length=200, blank=True, null=True)
+    organization_type_collab = models.CharField(max_length=50, blank=True, null=True)
+    ttdf_company = models.CharField(max_length=30,choices=TTDF_COMPANY_CHOICES,blank=True,null=True)
+    pan_file_collb = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="collaborator/pan"), blank=True, null=True)
+    pan_file_name_collab = models.CharField(max_length=255, blank=True, null=True)
+    mou_file_collab = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="collaborator/mou"), blank=True, null=True)
+    mou_file_name_collab = models.CharField(max_length=255, blank=True, null=True)
+
+class Equipment(models.Model):
+    form_submission = models.ForeignKey(FormSubmission, related_name="equipments", on_delete=models.CASCADE)
+    item = models.CharField(max_length=255, blank=True, null=True)
+    unit_price = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+    quantity = models.PositiveIntegerField(blank=True, null=True)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+    contributor_type = models.CharField(max_length=255, blank=True, null=True)
+
+class ShareHolder(models.Model):
+    form_submission = models.ForeignKey(FormSubmission, related_name="shareholders", on_delete=models.CASCADE)
+    share_holder_name = models.CharField(max_length=255, blank=True, null=True)
+    share_percentage = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
+    identity_document = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="shareholder/docs"), blank=True, null=True)
+    identity_document_name = models.CharField(max_length=255, blank=True, null=True)
+
+class RDStaff(models.Model):
+    form_submission = models.ForeignKey(FormSubmission, related_name="rdstaff", on_delete=models.CASCADE)
+    name = models.CharField(max_length=255, blank=True, null=True)
+    designation = models.CharField(max_length=255, blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
+    highest_qualification = models.CharField(max_length=255, blank=True, null=True)
+    mobile = models.CharField(max_length=20, blank=True, null=True)
+    resume = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="rdstaff/resume"), blank=True, null=True)
+    epf_details = models.CharField(max_length=255, blank=True, null=True)
+
+class SubShareHolder(models.Model):
+    form_submission = models.ForeignKey(FormSubmission, related_name="sub_shareholders", on_delete=models.CASCADE)
+    share_holder_name = models.CharField(max_length=255, blank=True, null=True)
+    share_percentage = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
+    identity_document = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="subshareholder/docs"), blank=True, null=True)
+    identity_document_name = models.CharField(max_length=255, blank=True, null=True)
+
+
+
+
 
 
 
@@ -677,18 +779,3 @@ class ApplicationStatusHistory(models.Model):
     class Meta:
         ordering = ['-change_date']
 
-    
-# class FundLoanDocument(models.Model):
-#     form_submission = models.ForeignKey(
-#         "dynamic_form.FormSubmission",
-#         on_delete=models.CASCADE,
-#         related_name="fund_loan_documents"
-#     )
-#     document = models.FileField(
-#         upload_to=service_folder_path("fund_loan_docs"),
-#         blank=True,
-#         null=True
-#     )
-
-#     def __str__(self):
-#         return self.document.name if self.document else "No file"

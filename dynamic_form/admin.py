@@ -13,12 +13,48 @@ class FormTemplateAdmin(admin.ModelAdmin):
     list_display = ('id','title', 'is_active', 'start_date', 'end_date')
 
 
+from django.contrib import admin
+from .models import (
+    FormSubmission, IPRDetails, FundLoanDocument, Collaborator, Equipment,
+    ShareHolder, RDStaff, SubShareHolder
+)
+
+# Inline admin for related models
+class IPRDetailsInline(admin.TabularInline):
+    model = IPRDetails
+    extra = 0
+
+class FundLoanDocumentInline(admin.TabularInline):
+    model = FundLoanDocument
+    extra = 0
+
+class CollaboratorInline(admin.TabularInline):
+    model = Collaborator
+    extra = 0
+
+class EquipmentInline(admin.TabularInline):
+    model = Equipment
+    extra = 0
+
+class ShareHolderInline(admin.TabularInline):
+    model = ShareHolder
+    extra = 0
+
+class RDStaffInline(admin.TabularInline):
+    model = RDStaff
+    extra = 0
+
+class SubShareHolderInline(admin.TabularInline):
+    model = SubShareHolder
+    extra = 0
+
 @admin.register(FormSubmission)
 class FormSubmissionAdmin(admin.ModelAdmin):
     list_display = ('id', 'proposal_id', 'template', 'service', 'applicant', 'status', 'created_at')
     readonly_fields = ['form_id', 'proposal_id', 'created_at', 'updated_at']
     search_fields = ['form_id', 'proposal_id', 'subject', 'description']
 
+    # Remove direct fields now handled in new related models!
     fieldsets = (
         ("General Info", {
             'fields': (
@@ -34,26 +70,10 @@ class FormSubmissionAdmin(admin.ModelAdmin):
                 'description', 'subject',
             )
         }),
-        ("Shareholder Details", {
-            'fields': (
-                'share_holder_name', 'share_percentage', 'identity_document',
-            )
-        }),
-        ("RD Staff Section", {
-            'fields': (
-                'rd_staff_name', 'rd_staff_designation', 'rd_staff_email', 'rd_staff_highest_qualification',
-                'rd_staff_mobile', 'rd_staff_resume', 'rd_staff_epf_details',
-            )
-        }),
-        ("Equipment Section", {
-            'fields': (
-                'equipment_item', 'equipment_unit_price', 'equipment_quantity',
-                'equipment_amount', 'equipment_contributor_type',
-            )
-        }),
+        # No more Shareholder/Equipment/RD Staff here: handled by inlines!
         ("Fund Details", {
             'fields': (
-                'has_loan', 'fund_loan_description', 'fund_loan_amount',  # For multiple documents, use an inline
+                'has_loan', 'fund_loan_description', 'fund_loan_amount',
             )
         }),
         ("Contribution Details", {
@@ -77,8 +97,26 @@ class FormSubmissionAdmin(admin.ModelAdmin):
                 'ttdf_applied_before',
             )
         }),
-        # Add other sections as you add fields!
     )
+
+    inlines = [
+        IPRDetailsInline,
+        FundLoanDocumentInline,
+        CollaboratorInline,
+        EquipmentInline,
+        ShareHolderInline,
+        RDStaffInline,
+        SubShareHolderInline,
+    ]
+
+# Register related models for completeness (optional, can be managed via inline)
+admin.site.register(IPRDetails)
+admin.site.register(FundLoanDocument)
+admin.site.register(Collaborator)
+admin.site.register(Equipment)
+admin.site.register(ShareHolder)
+admin.site.register(RDStaff)
+admin.site.register(SubShareHolder)
 
 
 @admin.register(FormPage)

@@ -40,27 +40,6 @@ class FormTemplateViewSet(viewsets.ReadOnlyModelViewSet):
         return qs
 
 
-
-# def save_milestones_for_submission(form_submission, milestones_data, user=None):
-#     """
-#     Create Milestone objects for a FormSubmission, given a list of milestone dicts.
-#     """
-#     for idx, m in enumerate(milestones_data):
-#         Milestone.objects.create(
-#             proposal=form_submission,
-#             title=m.get("title") or f"Milestone {idx+1}",
-#             description=m.get("description") or "",
-#             time_required=m.get("time_required") or 0,
-#             revised_time_required=m.get("revised_time_required"),
-#             grant_from_ttdf=m.get("grant_from_ttdf") or 0,
-#             initial_contri_applicant=m.get("initial_contri_applicant") or 0,
-#             revised_contri_applicant=m.get("revised_contri_applicant"),
-#             initial_grant_from_ttdf=m.get("initial_grant_from_ttdf"),
-#             revised_grant_from_ttdf=m.get("revised_grant_from_ttdf"),
-#             created_by=user,
-#         )
-
-
 def save_milestones_for_submission(form_submission, milestones_data, user=None):
     """
     Create/Update/Delete Milestone objects for a FormSubmission, given a list of milestone dicts.
@@ -107,12 +86,11 @@ def save_milestones_for_submission(form_submission, milestones_data, user=None):
         milestone.delete()
 
 
-
-
-class FormSubmissionViewSet(viewsets.ModelViewSet):
+class FormSubmissionViewSet(viewsets.ModelViewSet): 
     queryset = FormSubmission.objects.all().select_related('template', 'applicant')
     serializer_class = FormSubmissionSerializer
     permission_classes = [IsAuthenticated]
+    # authentication_classes = [JWTAuthentication]
     lookup_field = 'pk'
 
     def get_queryset(self):
@@ -120,36 +98,61 @@ class FormSubmissionViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
-        # Use request.data for normal fields, request.FILES for file fields
-        data = request.data.copy()  # This is OK for QueryDict, as long as you don't deepcopy files!
+        print("=== VIEW CREATE METHOD ===")
+        print(f"Request content type: {request.content_type}")
+        print(f"Request data keys: {list(request.data.keys())[:20]}")
+        
+        # Check for nested array fields
+        nested_fields = ['collaborators', 'equipments', 'rdstaff', 'shareholders', 'iprdetails', 'sub_shareholders', 'fund_loan_documents']
+        for field in nested_fields:
+            indexed_keys = [key for key in request.data.keys() if key.startswith(f"{field}[")]
+            if indexed_keys:
+                print(f"Found {len(indexed_keys)} indexed keys for {field}")
+        
+        data = request.data.copy()
         data.setdefault('status', FormSubmission.DRAFT)
-
-        # Handle user/profile upsert (see code below for safe file logic)
+        
         upsert_profile_and_user_from_submission(request.user, data, files=request.FILES)
 
-        serializer = self.get_serializer(data=data)
-        try:
-            serializer.is_valid(raise_exception=True)
-            submission = serializer.save()
-        except Exception as ex:
+        print("=== CREATING SERIALIZER ===")
+        serializer = self.get_serializer(data=data, context={'request': request})
+        
+        print("=== VALIDATING SERIALIZER ===")
+        if serializer.is_valid():
+            print("✅ Serializer validation passed")
+            try:
+                submission = serializer.save()
+                print(f"✅ Submission created successfully: {submission.id}")
+            except Exception as save_exception:
+                print(f"❌ Error during serializer.save(): {save_exception}")
+                import traceback
+                traceback.print_exc()
+                return Response(
+                    {
+                        "success": False, 
+                        "message": f"Could not save submission: {str(save_exception)}", 
+                        "errors": {"save_error": str(save_exception)}
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            print(f"❌ Serializer validation failed: {serializer.errors}")
             return Response(
                 {"success": False, "message": "Could not save submission.", "errors": serializer.errors},
                 status=status.HTTP_400_BAD_REQUEST
             )
+        
+        # Handle milestones
+        milestones = request.data.get("milestones")
+        if milestones and isinstance(milestones, list):
+            save_milestones_for_submission(submission, milestones, request.user)
 
-        milestones = request.data.get("milestones")        
-        if milestones:
-            if isinstance(milestones, str):
-                try:
-                    milestones = json.loads(milestones)
-                except Exception as e:
-                    return Response(
-                        {"success": False, "message": "Could not parse milestones.", "errors": str(e)},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
+        msg = "Saved as draft." if serializer.data.get('status') == FormSubmission.DRAFT else "Submitted successfully."
 
-            if isinstance(milestones, list):
-                save_milestones_for_submission(submission, milestones, request.user)
+        # ---- THIS IS THE KEY PART ----
+        resp_data = serializer.data.copy()
+        resp_data['form_id'] = submission.form_id
+        # ---- END KEY PART ----
 
         return Response(
             {
@@ -167,6 +170,8 @@ class FormSubmissionViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def update(self, request, *args, **kwargs):
+        print("=== VIEW UPDATE METHOD ===")
+        
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
         if instance.status != FormSubmission.DRAFT and request.data.get('status', instance.status) != FormSubmission.SUBMITTED:
@@ -174,36 +179,44 @@ class FormSubmissionViewSet(viewsets.ModelViewSet):
                 {"success": False, "message": "Cannot edit a finalized submission."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
         data = request.data.copy()
-        print("REQUEST DATA:", data)
         upsert_profile_and_user_from_submission(request.user, data, files=request.FILES)
 
-        serializer = self.get_serializer(instance, data=data, partial=partial)
-        try:
-            serializer.is_valid(raise_exception=True)
-            submission = serializer.save()
-        except Exception as ex:
+        serializer = self.get_serializer(instance, data=request.data, partial=partial, context={'request': request})
+        
+        if serializer.is_valid():
+            print("✅ Serializer validation passed")
+            try:
+                submission = serializer.save()
+                print(f"✅ Submission updated successfully: {submission.id}")
+            except Exception as save_exception:
+                print(f"❌ Error during serializer.save(): {save_exception}")
+                import traceback
+                traceback.print_exc()
+                return Response(
+                    {
+                        "success": False, 
+                        "message": f"Could not update submission: {str(save_exception)}", 
+                        "errors": {"save_error": str(save_exception)}
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            print(f"❌ Serializer validation failed: {serializer.errors}")
             return Response(
                 {"success": False, "message": "Could not update submission.", "errors": serializer.errors},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        # Handle milestones
         milestones = request.data.get("milestones")
-        print("MILESTONES PAYLOAD:", milestones)
-        if milestones:
-            if isinstance(milestones, str):
-                try:
-                    milestones = json.loads(milestones)
-                except Exception as e:
-                    return Response(
-                        {"success": False, "message": "Could not parse milestones.", "errors": str(e)},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-            if isinstance(milestones, list):
-                print("Calling save_milestones_for_submission...")
-                save_milestones_for_submission(submission, milestones, request.user)
-                print("Saved milestones for submission", submission.id)
+        if milestones and isinstance(milestones, list):
+            instance.milestones.all().delete()
+            save_milestones_for_submission(submission, milestones, request.user)
+
+        msg = "Saved as draft." if serializer.data.get('status') == FormSubmission.DRAFT else "Submitted successfully."
+        resp_data = serializer.data.copy()
+        resp_data['form_id'] = submission.form_id
 
         return Response(
             {
@@ -213,9 +226,6 @@ class FormSubmissionViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_200_OK
         )
-
-
-
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -265,179 +275,3 @@ class FormSubmissionViewSet(viewsets.ModelViewSet):
                 {"success": True, "data": data_with_pk},
                 status=status.HTTP_200_OK
             )
-
-
-
-
-
-# class FormSubmissionViewSet(viewsets.ModelViewSet): 
-#     queryset = FormSubmission.objects.all().select_related('template', 'applicant')
-#     serializer_class = FormSubmissionSerializer
-#     permission_classes = [IsAuthenticated]
-#     lookup_field = 'pk'
-
-#     def get_queryset(self):
-#         return self.queryset.filter(applicant=self.request.user)
-
-#     @transaction.atomic
-#     def create(self, request, *args, **kwargs):
-#         data = request.data.copy()
-#         data.setdefault('status', FormSubmission.DRAFT)
-#         upsert_profile_and_user_from_submission(request.user, data, files=request.FILES)
-
-#         serializer = self.get_serializer(data=data)
-#         try:
-#             serializer.is_valid(raise_exception=True)
-#             submission = serializer.save()
-#         except Exception as ex:
-#             print("Submission update exception:", ex)
-#             return Response(
-#                 {"success": False, "message": "Could not save submission.", "errors": serializer.errors},
-#                 status=status.HTTP_400_BAD_REQUEST
-#             )
-
-#         milestones = request.data.get("milestones")
-#         if milestones and isinstance(milestones, list):
-#             save_milestones_for_submission(submission, milestones, request.user)
-
-#         msg = "Saved as draft." if serializer.data.get('status') == FormSubmission.DRAFT else "Submitted successfully."
-
-#         # ---- THIS IS THE KEY PART ----
-#         resp_data = serializer.data.copy()
-        
-#         resp_data['form_id'] = submission.form_id
-#         # ---- END KEY PART ----
-
-#         return Response(
-#             {
-#                 "success": True,
-#                 "message": msg,
-#                 "id": submission.id,
-#                 "form_id": submission.form_id,
-#                 "proposal_id": submission.proposal_id,
-#                 "template": submission.template_id,
-#                 "service": submission.service_id,
-#                 "data": serializer.data
-#             },
-#             status=status.HTTP_201_CREATED
-#         )
-
-#     @transaction.atomic
-#     def update(self, request, *args, **kwargs):
-#         partial = kwargs.pop('partial', False)
-#         instance = self.get_object()
-#         if instance.status != FormSubmission.DRAFT and request.data.get('status', instance.status) != FormSubmission.SUBMITTED:
-#             return Response(
-#                 {"success": False, "message": "Cannot edit a finalized submission."},
-#                 status=status.HTTP_400_BAD_REQUEST
-#             )
-#         data = request.data.copy()
-
-#         # --- Update/create user and profile data
-#         upsert_profile_and_user_from_submission(request.user, data, files=request.FILES)
-
-#         serializer = self.get_serializer(instance, data=data, partial=partial)
-#         try:
-#             serializer.is_valid(raise_exception=True)
-#             submission = serializer.save()
-#         except Exception as ex:
-#             print("Submission update exception:", ex)
-#             return Response(
-#                 {"success": False, "message": "Could not save submission.", "errors": serializer.errors},
-#                 status=status.HTTP_400_BAD_REQUEST
-#             )
-
-#         milestones = request.data.get("milestones")
-#         if milestones and isinstance(milestones, list):
-#             instance.milestones.all().delete()
-#             save_milestones_for_submission(submission, milestones, request.user)
-
-#         msg = "Saved as draft." if serializer.data.get('status') == FormSubmission.DRAFT else "Submitted successfully."
-#         resp_data = serializer.data.copy()
-        
-#         resp_data['form_id'] = submission.form_id
-
-#         return Response(
-#             {"success": True, "message": msg, "data": resp_data},
-#             status=status.HTTP_200_OK
-#         )
-
-#     def destroy(self, request, *args, **kwargs):
-#         instance = self.get_object()
-#         if instance.status != FormSubmission.DRAFT:
-#             return Response(
-#                 {"success": False, "message": "Only drafts can be deleted."},
-#                 status=status.HTTP_400_BAD_REQUEST
-#             )
-#         self.perform_destroy(instance)
-#         return Response(
-#             {"success": True, "message": "Draft deleted."},
-#             status=status.HTTP_204_NO_CONTENT
-#         )
-
-#     def retrieve(self, request, *args, **kwargs):
-#         instance = self.get_object()
-#         serializer = self.get_serializer(instance)
-
-#         return Response(
-#             {
-#                 "success": True,
-#                 "id": instance.id,
-                
-#                 "form_id": instance.form_id,
-#                 "proposal_id": instance.proposal_id,
-#                 "data": serializer.data
-#             },
-#             status=status.HTTP_200_OK
-#         )
-
-#     def list(self, request, *args, **kwargs):
-#         queryset = self.filter_queryset(self.get_queryset())
-#         page = self.paginate_queryset(queryset)
-#         serializer = self.get_serializer(page, many=True) if page is not None else self.get_serializer(queryset, many=True)
-        
-#         # Add "pk" to each item (same as "id")
-#         data_with_pk = []
-#         for item in serializer.data:
-#             item = dict(item)  # If serializer.data is not a list of dicts yet
-#             item['pk'] = item['id']
-#             data_with_pk.append(item)
-        
-#         if page is not None:
-#             # If paginated, replace results with data_with_pk
-#             response = self.get_paginated_response(data_with_pk)
-#             response.data["success"] = True
-#             return response
-#         else:
-#             return Response(
-#                 {"success": True, "data": data_with_pk},
-#                 status=status.HTTP_200_OK
-#             )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
