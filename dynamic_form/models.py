@@ -162,7 +162,7 @@ class FormSubmission(models.Model):
         max_length=3, choices=YES_NO_CHOICES, blank=True, null=True
     )
     fund_loan_description = models.TextField(blank=True, null=True)
-    fund_loan_amount = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
+    fund_loan_amount = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
     # fund_loan_documents = models.JSONField(blank=True, null=True, default=list, help_text="List of uploaded file paths")
 
 
@@ -170,19 +170,19 @@ class FormSubmission(models.Model):
 
     contribution_expected_source = models.CharField(max_length=255, blank=True, null=True)
     contribution_item = models.CharField(max_length=255, blank=True, null=True)
-    contribution_amount = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
+    contribution_amount = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
 
     # ---8. Fund Details Section ---
     fund_source_details = models.CharField(max_length=255, blank=True, null=True)
     fund_item = models.CharField(max_length=255, blank=True, null=True)
-    fund_amount = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
+    fund_amount = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
 
     # ---9. Summary Section ---
-    grant_from_ttdf = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
-    contribution_applicant = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
-    expected_other_contribution = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
-    other_source_funding = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
-    total_project_cost = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
+    grant_from_ttdf = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
+    contribution_applicant = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
+    expected_other_contribution = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
+    other_source_funding = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
+    total_project_cost = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
 
 
     # ---10 Key Information Section ---
@@ -466,8 +466,8 @@ class FormSubmission(models.Model):
     account_type                = models.CharField(max_length=50,blank=True, null=True)
     bank_account_number         = models.CharField(max_length=30,blank=True, null=True)
     ifsc_code                   = models.CharField(max_length=20,blank=True, null=True)
-    expected_source_contribution = models.DecimalField(max_digits=12, decimal_places=2,blank=True, null=True)
-    details_source_funding = models.DecimalField(max_digits=12, decimal_places=2,blank=True, null=True)
+    expected_source_contribution = models.DecimalField(max_digits=12, decimal_places=5,blank=True, null=True)
+    details_source_funding = models.DecimalField(max_digits=12, decimal_places=5,blank=True, null=True)
 
     
     # ——— 7. Highlight Proposal ——————
@@ -513,8 +513,8 @@ class FormSubmission(models.Model):
     manpower_role              = models.CharField(max_length=200, blank=True, null=True)
     manpower_positions         = models.PositiveIntegerField(null=True, blank=True)
     manpower_duration_months   = models.PositiveIntegerField(null=True, blank=True)
-    manpower_proposed_salary   = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
-    manpower_total_cost        = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    manpower_proposed_salary   = models.DecimalField(max_digits=12, decimal_places=5, null=True, blank=True)
+    manpower_total_cost        = models.DecimalField(max_digits=12, decimal_places=5, null=True, blank=True)
 
     # ——— 11. Other Requirements ——————
     other_req_items            = models.JSONField(help_text="List of items: …",blank=True, null=True, default=list)
@@ -524,16 +524,16 @@ class FormSubmission(models.Model):
 
     # ——— 13. Finance Budget ——————
     budget_other_source_desc   = models.TextField(blank=True, null=True)
-    budget_amount_1            = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    budget_amount_1            = models.DecimalField(max_digits=12, decimal_places=5, null=True, blank=True)
     budget_other_source_2_desc = models.TextField(blank=True, null=True)
-    budget_amount_2            = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    budget_amount_2            = models.DecimalField(max_digits=12, decimal_places=5, null=True, blank=True)
 
     # ——— 14. Activities & Timelines ——————
     scope_of_work              = models.TextField(blank=True, null=True)
     time_required_months       = models.PositiveIntegerField(null=True, blank=True)
     activities                 = models.TextField(blank=True, null=True)
-    applicant_contribution     = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
-    grants_from_ttdf           = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    applicant_contribution     = models.DecimalField(max_digits=12, decimal_places=5, null=True, blank=True)
+    grants_from_ttdf           = models.DecimalField(max_digits=12, decimal_places=5, null=True, blank=True)
 
     # ——— 15. Declaration ——————
     declaration_document       = models.FileField(upload_to='declarations/',blank=True, null=True)
@@ -678,9 +678,9 @@ class Collaborator(models.Model):
 class Equipment(models.Model):
     form_submission = models.ForeignKey(FormSubmission, related_name="equipments", on_delete=models.CASCADE)
     item = models.CharField(max_length=255, blank=True, null=True)
-    unit_price = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+    unit_price = models.DecimalField(max_digits=12, decimal_places=5, blank=True, null=True)
     quantity = models.PositiveIntegerField(blank=True, null=True)
-    amount = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+    amount = models.DecimalField(max_digits=12, decimal_places=5, blank=True, null=True)
     contributor_type = models.CharField(max_length=255, blank=True, null=True)
 
 class ShareHolder(models.Model):
