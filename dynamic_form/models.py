@@ -654,6 +654,8 @@ class Collaborator(models.Model):
     mou_file_collab = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="collaborator/mou"), blank=True, null=True)
     mou_file_name_collab = models.CharField(max_length=255, blank=True, null=True)
 
+
+
 class Equipment(models.Model):
     form_submission = models.ForeignKey(FormSubmission, related_name="equipments", on_delete=models.CASCADE)
     item = models.CharField(max_length=255, blank=True, null=True)

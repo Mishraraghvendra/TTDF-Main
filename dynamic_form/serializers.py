@@ -77,6 +77,7 @@ class FullProfileSerializer(serializers.ModelSerializer):
 
 
 class FormSubmissionSerializer(serializers.ModelSerializer):
+    collaborators = CollaboratorSerializer(many=True)
     milestones = MilestoneSerializer(many=True, read_only=True)
     applicant = UserShortSerializer(read_only=True)
     profile = serializers.SerializerMethodField()
@@ -107,6 +108,28 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
         data['sub_shareholders'] = SubShareHolderSerializer(instance.sub_shareholders.all(), many=True).data
         
         return data
+    
+    def validate(self, data):
+        collaborators = data.get('collaborators', [])
+        proposed_village = data.get('proposed_village')
+        for collab in collaborators:
+            org_name = collab.get('organization_name_collab')
+            pan_name = collab.get('pan_file_name_collab')
+            # Check for duplicate across the system
+            qs = Collaborator.objects.filter(
+                organization_name_collab=org_name,
+                pan_file_name_collab=pan_name,
+                form_submission__proposed_village=proposed_village,
+            )
+            # If this is an update, exclude current instance
+            if self.instance:
+                qs = qs.exclude(form_submission=self.instance)
+            if qs.exists():
+                raise serializers.ValidationError(
+                    f"Collaborator '{org_name}' with PAN '{pan_name}' already exists for village '{proposed_village}'."
+                )
+        return data
+
 
     def to_internal_value(self, data):
         json_fields = [
@@ -581,3 +604,19 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
 
         print("=== FINISHED UPDATING OBJECTS ===")
         return instance
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
