@@ -7,7 +7,7 @@ from users.models import User, Profile
 from django.utils import timezone
 import json
 import re
-
+ 
 
 class IPRDetailsSerializer(serializers.ModelSerializer):
     class Meta:
@@ -276,8 +276,6 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
         self._pending_milestones = self._nested_data.get('milestones', [])
 
         return super().to_internal_value(data)
-
-
    
     def validate(self, data):
 
@@ -377,12 +375,61 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError("Cannot edit after deadline/final submit.")
         
         return data
+    
+    def to_representation(self, instance):
+        """Add nested data AND flatten profile fields to the response"""
+        data = super().to_representation(instance)
+        
+        # Add nested serialized data to response
+        data['fund_loan_documents'] = FundLoanDocumentSerializer(instance.fund_loan_documents.all(), many=True).data
+        data['iprdetails'] = IPRDetailsSerializer(instance.iprdetails.all(), many=True).data
+        data['collaborators'] = CollaboratorSerializer(instance.collaborators.all(), many=True).data
+        data['equipments'] = EquipmentSerializer(instance.equipments.all(), many=True).data
+        data['shareholders'] = ShareHolderSerializer(instance.shareholders.all(), many=True).data
+        data['rdstaff'] = RDStaffSerializer(instance.rdstaff.all(), many=True).data
+        data['sub_shareholders'] = SubShareHolderSerializer(instance.sub_shareholders.all(), many=True).data
+        
+        # ✅ FLATTEN PROFILE FIELDS TO ROOT LEVEL - THIS IS THE FIX
+        profile = getattr(instance.applicant, "profile", None)
+        if profile:
+            # Add Profile fields directly to the root level for frontend compatibility
+            data.update({
+                'company_mobile_no': profile.company_mobile_no or "",
+                'landline_number': profile.landline_number or "",
+                'website_link': profile.website_link or "",
+                'proposal_submitted_by': profile.proposal_submitted_by or "",
+                'applicant_official_email': profile.applicant_official_email or "",
+                'address_line_1': profile.address_line_1 or "",
+                'address_line_2': profile.address_line_2 or "",
+                'street_village': profile.street_village or "",
+                'qualification': profile.qualification or "",
+                'city': profile.city or "",
+                'country': profile.country or "",
+                'state': profile.state or "",
+                'pincode': profile.pincode or "",
+                'specialization': profile.specialization or "",
+                'dob': profile.dob.isoformat() if profile.dob else "",
+                'proposal_duration_years': profile.proposal_duration_years or "",
+                'proposal_duration_months': profile.proposal_duration_months or "",
+                'application_submission_date': profile.application_submission_date.isoformat() if profile.application_submission_date else "",
+                'is_applied_before': profile.is_applied_before or False,
+                'applicant_type': profile.applicant_type or "",
+                'applicant_aadhar': profile.applicant_aadhar or "",
+                'applicant_passport': profile.applicant_passport or "",
+                'is_organization_domestic': profile.is_organization_domestic,
+                'id_type': profile.id_type or "",
+                'id_number': profile.id_number or "",
+                'company_as_per_guidelines': profile.company_as_per_guidelines or "",
+            })
+        
+        return data
+
+
 
     def get_milestones(self, obj):
             # You must return serialized data for milestones!
             # (Assuming you have a related_name='milestones' on FormSubmission model)
             return MilestoneSerializer(obj.milestones.all(), many=True).data
-
 
     def get_service_name(self, obj):
         return obj.service.name if obj.service else None
@@ -496,7 +543,6 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
                 val = rec.get(field)
                 if isinstance(val, str) and val in files:
                     rec[field] = files[val]
-
 
     def create(self, validated_data):
         request = self.context['request']
