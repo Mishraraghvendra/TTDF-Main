@@ -588,6 +588,8 @@ class FormSubmission(models.Model):
     def __str__(self):
         return f"{self.form_id} ({self.get_status_display()})"
 
+
+
 class IPRDetails(models.Model):
     submission = models.ForeignKey(FormSubmission, related_name='iprdetails', on_delete=models.CASCADE)
     name = models.CharField(max_length=255, help_text="Unique name or label for this form entry",blank=True, null=True)
@@ -653,6 +655,7 @@ class Collaborator(models.Model):
     pan_file_name_collab = models.CharField(max_length=255, blank=True, null=True)
     mou_file_collab = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="collaborator/mou"), blank=True, null=True)
     mou_file_name_collab = models.CharField(max_length=255, blank=True, null=True)
+
 
 
 
