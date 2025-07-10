@@ -75,15 +75,54 @@ class FullProfileSerializer(serializers.ModelSerializer):
         model = Profile
         exclude = ["id", "user"]
 
+class CollaboratorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Collaborator
+        fields = '__all__'
+
+    def validate(self, data):
+        # Uniqueness for org name or PAN per village
+        org_name = (data.get('organization_name_collab') or '').strip().lower()
+        pan_name = (data.get('pan_file_name_collab') or '').strip().upper()
+        form_submission = data.get('form_submission') or (self.instance and self.instance.form_submission)
+        # Resolve FormSubmission instance if just ID
+        if form_submission and not isinstance(form_submission, FormSubmission):
+            form_submission = FormSubmission.objects.filter(pk=form_submission).first()
+        proposed_village = getattr(form_submission, 'proposed_village', None)
+        # Org check
+        if org_name:
+            qs = Collaborator.objects.filter(
+                organization_name_collab__iexact=org_name,
+                form_submission__proposed_village=proposed_village,
+            )
+            if self.instance:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise serializers.ValidationError(
+                    f"Collaborator with organization name '{org_name}' already exists for village '{proposed_village}'."
+                )
+        # PAN check
+        if pan_name:
+            qs = Collaborator.objects.filter(
+                pan_file_name_collab__iexact=pan_name,
+                form_submission__proposed_village=proposed_village,
+            )
+            if self.instance:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise serializers.ValidationError(
+                    f"Collaborator with PAN '{pan_name}' already exists for village '{proposed_village}'."
+                )
+        return data
+
+
+
 
 class FormSubmissionSerializer(serializers.ModelSerializer):
-    collaborators = CollaboratorSerializer(many=True)
-    milestones = MilestoneSerializer(many=True, read_only=True)
-    applicant = UserShortSerializer(read_only=True)
-    profile = serializers.SerializerMethodField()
-    service_name = serializers.SerializerMethodField()
-    last_updated = serializers.SerializerMethodField()
-    create_date = serializers.SerializerMethodField()
+    # Assume nested serializers are defined elsewhere
+    collaborators = CollaboratorSerializer(many=True, read_only=True)
+    milestones = serializers.SerializerMethodField()
+    # ... other fields/nested serializers ...
 
     class Meta:
         model = FormSubmission
@@ -91,144 +130,99 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'id', 'applicant', 'form_id', 'proposal_id',
             'created_at', 'updated_at',
-            'service_name', 'last_updated', 'create_date'
         ]
 
-    def to_representation(self, instance):
-        """Add nested data to the response"""
-        data = super().to_representation(instance)
-        
-        # Add nested serialized data to response
-        data['fund_loan_documents'] = FundLoanDocumentSerializer(instance.fund_loan_documents.all(), many=True).data
-        data['iprdetails'] = IPRDetailsSerializer(instance.iprdetails.all(), many=True).data
-        data['collaborators'] = CollaboratorSerializer(instance.collaborators.all(), many=True).data
-        data['equipments'] = EquipmentSerializer(instance.equipments.all(), many=True).data
-        data['shareholders'] = ShareHolderSerializer(instance.shareholders.all(), many=True).data
-        data['rdstaff'] = RDStaffSerializer(instance.rdstaff.all(), many=True).data
-        data['sub_shareholders'] = SubShareHolderSerializer(instance.sub_shareholders.all(), many=True).data
-        
-        return data
+ 
     
-    def validate(self, data):
-        collaborators = data.get('collaborators', [])
-        proposed_village = data.get('proposed_village')
-        for collab in collaborators:
-            org_name = collab.get('organization_name_collab')
-            pan_name = collab.get('pan_file_name_collab')
-            # Check for duplicate across the system
-            qs = Collaborator.objects.filter(
-                organization_name_collab=org_name,
-                pan_file_name_collab=pan_name,
-                form_submission__proposed_village=proposed_village,
-            )
-            # If this is an update, exclude current instance
-            if self.instance:
-                qs = qs.exclude(form_submission=self.instance)
-            if qs.exists():
-                raise serializers.ValidationError(
-                    f"Collaborator '{org_name}' with PAN '{pan_name}' already exists for village '{proposed_village}'."
-                )
-        return data
-
 
     def to_internal_value(self, data):
+        import json, re
         json_fields = [
             'fund_loan_documents', 'iprdetails', 'collaborators', 'equipments',
             'shareholders', 'rdstaff', 'sub_shareholders', 'milestones'
         ]
-        
         print("=== PROCESSING REQUEST DATA ===")
         print(f"Data type: {type(data)}")
-        print(f"Available keys: {list(data.keys())[:20]}...")  # Show first 20 keys
-        
-        # Handle array fields that come as separate form fields or JSON strings
+        print(f"Available keys: {list(data.keys())[:20]}...")
+
+        if not hasattr(self, '_nested_data'):
+            self._nested_data = {}
+
+        # Pass 1: Try basic JSON parsing for all fields (quick path, AJAX/fetch use case)
         for field in json_fields:
+            field_data = data.get(field, None)
+            if field_data and isinstance(field_data, str):
+                try:
+                    parsed = json.loads(field_data)
+                    self._nested_data[field] = parsed if isinstance(parsed, list) else [parsed]
+                    print(f"Parsed {field}: {len(self._nested_data[field])} items from JSON string")
+                    continue  # skip to next field if handled
+                except Exception as e:
+                    print(f"Error parsing {field}: {e}")
+                    self._nested_data[field] = []
+                    continue
+
+        # Pass 2: For any fields not set above, use the advanced logic (file upload, indexed, etc.)
+        for field in json_fields:
+            if field in self._nested_data:
+                continue  # already parsed from above
+
             field_data = []
-            
-            # NEW: Check for array values (multiple files with same field name)
+
+            # Array values (files or arrays) from multipart/form-data
             if hasattr(data, 'getlist'):
                 array_values = data.getlist(field)
-                
-                # Handle multiple files with same field name (e.g., fund_loan_documents)
-                if array_values and len(array_values) > 0:
-                    # Check if these are file objects
-                    if all(hasattr(value, 'read') and hasattr(value, 'name') for value in array_values if value):
-                        # Special handling for fund_loan_documents (file-only model)
-                        if field == 'fund_loan_documents':
-                            field_data = [{'document': file} for file in array_values if file]
-                            print(f"✅ {field}: Found {len(field_data)} files as array (no indexing)")
-                        elif field == 'rdstaff':
-                            # For rdstaff, if files are uploaded via array, create basic structure
-                            field_data = [{'resume': file} for file in array_values if file]
-                            print(f"✅ {field}: Found {len(field_data)} resume files as array")
-                        elif field == 'shareholders':
-                            field_data = [{'identity_document': file} for file in array_values if file]
-                            print(f"✅ {field}: Found {len(field_data)} identity documents as array")
-                        elif field == 'sub_shareholders':
-                            field_data = [{'identity_document': file} for file in array_values if file]
-                            print(f"✅ {field}: Found {len(field_data)} sub-shareholder documents as array")
-                        elif field == 'collaborators':
-                            field_data = [{'pan_file_collb': file} for file in array_values if file]
-                            print(f"✅ {field}: Found {len(field_data)} collaborator files as array")
-                        elif field == 'iprdetails':
-                            field_data = [{'t_support_letter': file} for file in array_values if file]
-                            print(f"✅ {field}: Found {len(field_data)} support letters as array")
-                        else:
-                            # Generic file handling
-                            field_data = [{'file_field': file} for file in array_values if file]
-                            print(f"✅ {field}: Found {len(field_data)} files as array")
-                    
-                    # Handle JSON string arrays
-                    elif len(array_values) == 1 and isinstance(array_values[0], str):
+                if array_values and all(hasattr(f, 'read') and hasattr(f, 'name') for f in array_values if f):
+                    # File arrays
+                    if field == 'fund_loan_documents':
+                        field_data = [{'document': file} for file in array_values if file]
+                    elif field == 'rdstaff':
+                        field_data = [{'resume': file} for file in array_values if file]
+                    elif field == 'shareholders' or field == 'sub_shareholders':
+                        field_data = [{'identity_document': file} for file in array_values if file]
+                    elif field == 'collaborators':
+                        field_data = [{'pan_file_collb': file} for file in array_values if file]
+                    elif field == 'iprdetails':
+                        field_data = [{'t_support_letter': file} for file in array_values if file]
+                    else:
+                        field_data = [{'file_field': file} for file in array_values if file]
+                    print(f"✅ {field}: Found {len(field_data)} files as array")
+                elif array_values and len(array_values) == 1 and isinstance(array_values[0], str):
+                    # JSON string in array
+                    try:
+                        field_data = json.loads(array_values[0])
+                        print(f"✅ {field}: Parsed from JSON string -> {len(field_data)} items")
+                    except Exception as e:
+                        print(f"❌ {field}: JSON parse failed: {e}")
+                        field_data = []
+                elif array_values and all(isinstance(v, str) for v in array_values):
+                    for value in array_values:
                         try:
-                            field_data = json.loads(array_values[0])
-                            print(f"✅ {field}: Parsed from JSON string -> {len(field_data)} items")
-                        except (json.JSONDecodeError, ValueError) as e:
-                            print(f"❌ {field}: JSON parse failed: {e}")
-                            field_data = []
-                    
-                    # Handle multiple JSON strings
-                    elif all(isinstance(value, str) for value in array_values):
-                        for value in array_values:
-                            try:
-                                parsed_item = json.loads(value)
-                                if isinstance(parsed_item, list):
-                                    field_data.extend(parsed_item)
-                                else:
-                                    field_data.append(parsed_item)
-                            except (json.JSONDecodeError, ValueError):
-                                # If not JSON, treat as simple string data
-                                field_data.append({'value': value})
-                        print(f"✅ {field}: Parsed multiple JSON strings -> {len(field_data)} items")
-            
-            # If no array values found, check for indexed array fields
+                            parsed_item = json.loads(value)
+                            if isinstance(parsed_item, list):
+                                field_data.extend(parsed_item)
+                            else:
+                                field_data.append(parsed_item)
+                        except Exception:
+                            field_data.append({'value': value})
+                    print(f"✅ {field}: Parsed multiple JSON strings -> {len(field_data)} items")
+
+            # Indexed fields: e.g., collaborators[0][contact_person_name_collab]
             if not field_data and hasattr(data, 'keys'):
-                # Collect all keys that start with this field name
                 field_keys = [key for key in data.keys() if key.startswith(f"{field}[")]
-                
                 if field_keys:
-                    print(f"Found indexed fields for {field}: {len(field_keys)} keys")
-                    
-                    # Group by index
                     indexed_items = {}
                     for key in field_keys:
-                        # Parse key like "collaborators[0][contact_person_name_collab]"
                         match = re.match(rf"{field}\[(\d+)\]\[(.+)\]", key)
                         if match:
                             index = int(match.group(1))
                             sub_field = match.group(2)
-                            
                             if index not in indexed_items:
                                 indexed_items[index] = {}
-                            
-                            # Get the value
                             value = data.get(key)
                             if hasattr(data, 'getlist'):
-                                # For QueryDict, get the first value
                                 values = data.getlist(key)
                                 value = values[0] if values else ''
-                            
-                            # Convert numeric strings to appropriate types
                             if sub_field in ['quantity', 'share_percentage', 'unit_price', 'amount', 'time_required', 'grant_from_ttdf', 'initial_contri_applicant']:
                                 try:
                                     if '.' in str(value):
@@ -237,59 +231,29 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
                                         value = int(value)
                                 except (ValueError, TypeError):
                                     pass
-                            
                             indexed_items[index][sub_field] = value
-                    
-                    # Convert to list, sorted by index
                     for i in sorted(indexed_items.keys()):
                         field_data.append(indexed_items[i])
-                    
                     print(f"✅ {field}: Parsed {len(field_data)} items from indexed fields")
-            
-            # If still no data, check for single JSON string or list
+
+            # If still empty, maybe it's a direct list
             if not field_data:
                 value = data.get(field)
-                if value is not None:
-                    if isinstance(value, str):
-                        try:
-                            field_data = json.loads(value)
-                            print(f"✅ {field}: Parsed from JSON string -> {len(field_data)} items")
-                        except (json.JSONDecodeError, ValueError) as e:
-                            print(f"❌ {field}: JSON parse failed: {e}")
-                            field_data = []
-                    elif isinstance(value, list):
-                        # Handle list that might contain JSON strings
-                        if len(value) == 1 and isinstance(value[0], str):
-                            try:
-                                field_data = json.loads(value[0])
-                                print(f"✅ {field}: Parsed from list[str] -> {len(field_data)} items")
-                            except (json.JSONDecodeError, ValueError) as e:
-                                print(f"❌ {field}: List parse failed: {e}")
-                                field_data = []
-                        else:
-                            field_data = value
-                            print(f"✅ {field}: Already a list -> {len(field_data)} items")
-                    else:
-                        print(f"❌ {field}: Unexpected type {type(value)}")
-                        field_data = []
-                else:
-                    field_data = []
-                    print(f"ℹ️ {field}: No data found, using empty list")
-            
-            # Store the processed array data - this will be accessed later in create/update
-            # Don't add it to the main data dict to avoid validation issues
-            if not hasattr(self, '_nested_data'):
-                self._nested_data = {}
+                if isinstance(value, list):
+                    field_data = value
+                    print(f"✅ {field}: Already a list -> {len(field_data)} items")
+
             self._nested_data[field] = field_data
-        
+
+        # LOGGING final array sizes
         print("=== FINAL ARRAY SIZES ===")
         for field in json_fields:
-            field_data = getattr(self, '_nested_data', {}).get(field, [])
-            print(f"{field}: {len(field_data)} items")
-            if field_data and len(field_data) > 0:
-                print(f"  First item: {field_data[0]}")
-        
-        # Remove nested fields from data to avoid validation - CRITICAL STEP
+            arr = self._nested_data.get(field, [])
+            print(f"{field}: {len(arr)} items")
+            if arr and len(arr) > 0:
+                print(f"  First item: {arr[0]}")
+
+        # Remove nested fields from data to avoid DRF errors
         for field in json_fields:
             if field in data:
                 if hasattr(data, '_mutable'):
@@ -298,8 +262,6 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
                     data._mutable = False
                 else:
                     data.pop(field, None)
-            
-            # Also remove any indexed field keys
             keys_to_remove = [key for key in data.keys() if key.startswith(f"{field}[")]
             for key in keys_to_remove:
                 if hasattr(data, '_mutable'):
@@ -308,17 +270,119 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
                     data._mutable = False
                 else:
                     data.pop(key, None)
-        
+
+        # Optionally: stash for validator access if you need
+        self._pending_collaborators = self._nested_data.get('collaborators', [])
+        self._pending_milestones = self._nested_data.get('milestones', [])
+
         return super().to_internal_value(data)
 
-    def _inject_file_objects(self, records, file_field_names):
-        """Inject file objects from request.FILES into record dictionaries"""
-        files = self.context['request'].FILES
-        for rec in records:
-            for field in file_field_names:
-                val = rec.get(field)
-                if isinstance(val, str) and val in files:
-                    rec[field] = files[val]
+
+   
+    def validate(self, data):
+
+        current_status = data.get('status') or (self.instance and self.instance.status)
+        if current_status != FormSubmission.SUBMITTED:
+            return data
+        # --- Print all Collaborators before ---
+        print("\n=== ALL Collaborators in DB BEFORE VALIDATION ===")
+        for c in Collaborator.objects.all():
+            print(
+                f"ID: {c.id} | Org: '{c.organization_name_collab}' | PAN: '{c.pan_file_name_collab}' | Village: '{getattr(c.form_submission, 'proposed_village', None)}' | Submission: {c.form_submission_id}"
+            )
+        print("=== END ALL COLLABORATORS IN DB ===\n")
+
+        collaborators = getattr(self, '_pending_collaborators', [])
+        proposed_village = data.get('proposed_village') or (self.instance and self.instance.proposed_village)
+        orgs_seen = set()
+        pans_seen = set()
+
+        print("\n==== Collaborator Uniqueness Check START ====")
+        print(f"Proposed village: {proposed_village}")
+        print(f"Collaborators in submission: {len(collaborators)}")
+
+        # 1. Intra-request duplicate check
+        for collab in collaborators:
+            org = (collab.get('organization_name_collab') or '').strip().lower()
+            pan = (collab.get('pan_file_name_collab') or '').strip().upper()
+            print(f"  Collaborator: org='{org}' pan='{pan}'")
+            if org and org in orgs_seen:
+                print(f"❌ Duplicate org in this submission: {org}")
+                raise serializers.ValidationError(f"Duplicate organization '{org}' in collaborators for this submission.")
+            if pan and pan in pans_seen:
+                print(f"❌ Duplicate PAN in this submission: {pan}")
+                raise serializers.ValidationError(f"Duplicate PAN '{pan}' in collaborators for this submission.")
+            orgs_seen.add(org)
+            pans_seen.add(pan)
+
+        # 2. Database duplicate check (org)
+        for org in orgs_seen:
+            db_qs = Collaborator.objects.filter(
+                organization_name_collab__iexact=org,
+                form_submission__proposed_village=proposed_village,
+                form_submission__status=FormSubmission.SUBMITTED,  # Only consider submitted forms!
+            )
+            if self.instance:
+                db_qs = db_qs.exclude(form_submission=self.instance)
+            if db_qs.exists():
+                existing_collab = db_qs.first()
+                submission = existing_collab.form_submission if existing_collab else None
+                proposal_id = getattr(submission, 'proposal_id', None)
+                form_id = getattr(submission, 'form_id', None)
+                proposal_identifier = proposal_id or form_id or "Unknown"
+
+                raise serializers.ValidationError({
+                    "non_field_errors": [
+                        f"Collaborator with organization '{org}' already exists for village '{proposed_village}'. Proposal ID: {proposal_identifier}"
+                    ]
+                })
+
+        # Database duplicate check (PAN)
+        for pan in pans_seen:
+            if not pan:
+                continue
+            db_qs = Collaborator.objects.filter(
+                pan_file_name_collab__iexact=pan,
+                form_submission__proposed_village=proposed_village,
+                form_submission__status=FormSubmission.SUBMITTED,  # Only block for submitted!
+            )
+            if self.instance:
+                db_qs = db_qs.exclude(form_submission=self.instance)
+            if db_qs.exists():
+                existing_collab = db_qs.first()
+                submission = existing_collab.form_submission if existing_collab else None
+                proposal_id = getattr(submission, 'proposal_id', None)
+                form_id = getattr(submission, 'form_id', None)
+                proposal_identifier = proposal_id or form_id or "Unknown"
+
+                raise serializers.ValidationError({
+                    "non_field_errors": [
+                        f"Collaborator with PAN '{pan}' already exists for village '{proposed_village}'. Proposal ID: {proposal_identifier}"
+                    ]
+                })
+
+        print("==== Collaborator Uniqueness Check PASSED ====\n")
+
+        # Template/business rule checks
+        tpl = data.get('template') or (self.instance.template if self.instance else None)
+        if tpl:
+            now = timezone.now()
+            if not tpl.is_active:
+                raise serializers.ValidationError("Form not active.")
+            if tpl.start_date and now < tpl.start_date:
+                raise serializers.ValidationError("Not open yet.")
+            if tpl.end_date and now > tpl.end_date:
+                raise serializers.ValidationError("Deadline passed.")
+            if self.instance and not self.instance.can_edit():
+                raise serializers.ValidationError("Cannot edit after deadline/final submit.")
+        
+        return data
+
+    def get_milestones(self, obj):
+            # You must return serialized data for milestones!
+            # (Assuming you have a related_name='milestones' on FormSubmission model)
+            return MilestoneSerializer(obj.milestones.all(), many=True).data
+
 
     def get_service_name(self, obj):
         return obj.service.name if obj.service else None
@@ -339,21 +403,100 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
             return None
         return FullProfileSerializer(profile).data
 
-    def validate(self, data):
-        # Only validate the main form template constraints
-        tpl = data.get('template') or (self.instance.template if self.instance else None)
-        if tpl:
-            now = timezone.now()
-            if not tpl.is_active:
-                raise serializers.ValidationError("Form not active.")
-            if tpl.start_date and now < tpl.start_date:
-                raise serializers.ValidationError("Not open yet.")
-            if tpl.end_date and now > tpl.end_date:
-                raise serializers.ValidationError("Deadline passed.")
-            if self.instance and not self.instance.can_edit():
-                raise serializers.ValidationError("Cannot edit after deadline/final submit.")
-        
-        return data
+    # def validate(self, data):
+    #     from dynamic_form.models import Collaborator  # adjust import if needed
+
+    #     collaborators = data.get('collaborators', [])
+    #     proposed_village = data.get('proposed_village') or (self.instance and self.instance.proposed_village)
+    #     orgs_seen = set()
+    #     pans_seen = set()
+
+    #     # === Print ALL collaborators in DB for debugging ===
+    #     print("\n=== ALL Collaborators in DB BEFORE VALIDATION ===")
+    #     all_collabs = Collaborator.objects.all().order_by("id")
+    #     for c in all_collabs:
+    #         print(f"ID: {c.id} | Org: '{c.organization_name_collab}' | PAN: '{c.pan_file_name_collab}' | Village: '{getattr(c.form_submission, 'proposed_village', None)}' | Submission: {getattr(c.form_submission, 'id', None)}")
+    #     print("=== END ALL COLLABORATORS IN DB ===")
+
+    #     print("\n==== Collaborator Uniqueness Check START ====")
+    #     print(f"Proposed village: {proposed_village}")
+    #     print(f"Collaborators in submission: {len(collaborators)}")
+
+    #     # 1. Check for duplicates *within this request*
+    #     for collab in collaborators:
+    #         org = (collab.get('organization_name_collab') or '').strip().lower()
+    #         pan = (collab.get('pan_file_name_collab') or '').strip().upper()
+    #         print(f"  Collaborator: org='{org}' pan='{pan}'")
+    #         if org and org in orgs_seen:
+    #             print(f"❌ Duplicate org in this submission: {org}")
+    #             raise serializers.ValidationError(f"Duplicate organization '{org}' in collaborators for this submission.")
+    #         if pan and pan in pans_seen:
+    #             print(f"❌ Duplicate PAN in this submission: {pan}")
+    #             raise serializers.ValidationError(f"Duplicate PAN '{pan}' in collaborators for this submission.")
+    #         orgs_seen.add(org)
+    #         pans_seen.add(pan)
+
+    #     # 2. Check against DB (print all found)
+    #     for org in orgs_seen:
+    #         db_qs = Collaborator.objects.filter(
+    #             organization_name_collab__iexact=org,
+    #             form_submission__proposed_village=proposed_village,
+    #         )
+    #         if self.instance:
+    #             db_qs = db_qs.exclude(form_submission=self.instance)
+    #         db_count = db_qs.count()
+    #         print(f"DB check for org '{org}' in village '{proposed_village}': found {db_count} records.")
+    #         if db_count > 0:
+    #             for c in db_qs:
+    #                 print(f"  -> DB match org: {c.organization_name_collab} | PAN: {c.pan_file_name_collab} | Submission: {getattr(c.form_submission, 'id', None)}")
+    #             raise serializers.ValidationError(
+    #                 f"Collaborator with organization '{org}' already exists for village '{proposed_village}'."
+    #             )
+
+    #     for pan in pans_seen:
+    #         if not pan:
+    #             continue
+    #         db_qs = Collaborator.objects.filter(
+    #             pan_file_name_collab__iexact=pan,
+    #             form_submission__proposed_village=proposed_village,
+    #         )
+    #         if self.instance:
+    #             db_qs = db_qs.exclude(form_submission=self.instance)
+    #         db_count = db_qs.count()
+    #         print(f"DB check for PAN '{pan}' in village '{proposed_village}': found {db_count} records.")
+    #         if db_count > 0:
+    #             for c in db_qs:
+    #                 print(f"  -> DB match org: {c.organization_name_collab} | PAN: {c.pan_file_name_collab} | Submission: {getattr(c.form_submission, 'id', None)}")
+    #             raise serializers.ValidationError(
+    #                 f"Collaborator with PAN '{pan}' already exists for village '{proposed_village}'."
+    #             )
+
+    #     print("==== Collaborator Uniqueness Check PASSED ====\n")
+
+    #     # --- Template/business rule checks
+    #     tpl = data.get('template') or (self.instance.template if self.instance else None)
+    #     if tpl:
+    #         now = timezone.now()
+    #         if not tpl.is_active:
+    #             raise serializers.ValidationError("Form not active.")
+    #         if tpl.start_date and now < tpl.start_date:
+    #             raise serializers.ValidationError("Not open yet.")
+    #         if tpl.end_date and now > tpl.end_date:
+    #             raise serializers.ValidationError("Deadline passed.")
+    #         if self.instance and not self.instance.can_edit():
+    #             raise serializers.ValidationError("Cannot edit after deadline/final submit.")
+
+    #     return data
+
+    def _inject_file_objects(self, records, file_field_names):
+        """Inject file objects from request.FILES into record dictionaries"""
+        files = self.context['request'].FILES
+        for rec in records:
+            for field in file_field_names:
+                val = rec.get(field)
+                if isinstance(val, str) and val in files:
+                    rec[field] = files[val]
+
 
     def create(self, validated_data):
         request = self.context['request']
@@ -610,13 +753,20 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
 
 
 
-
-
-
-
-
-
-
-
-
     
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

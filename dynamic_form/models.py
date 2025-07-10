@@ -280,7 +280,20 @@ class FormSubmission(models.Model):
         default=dict,
         help_text="Nested budget: {'tables':[{'id':'','title':'','serviceOfferings':[{'id':'','name':'','items':[{'id':'','description':'','financials':{'capex':{'year0':{...}},'opex':{'year1':{...}}}}]}]}]}"
     )
+    budget_estimate_sample_doc = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="Sample Document"),blank=True, null=True)
     
+
+    equipment_overhead = models.JSONField(
+        blank=True,
+        null=True,
+        default=dict,
+        help_text=(
+            "Nested equipment overhead: "
+            "{'tables':[{'id':'','title':'','serviceOfferings':[{'id':'','name':'','items':[{'id':'','description':'','financials':{'capex':{'year0':{...}},'opex':{'year1':{...},'year2':{...}}}}]}]}]}"
+        )
+    )
+
+    equipment_overhead_sample_doc = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="Sample Document"),blank=True, null=True)
 
     # --- Income Estimate Section ---
     income_estimate = models.JSONField(
@@ -292,6 +305,9 @@ class FormSubmission(models.Model):
             "{'rows':[{'id':'','serviceOffering':'','year1':{'estimatedTransactions':'','userCharge':'','estimatedRevenue':''},'year2':{'estimatedTransactions':'','userCharge':'','estimatedRevenue':''}}]}"
         )
     )
+
+    income_estimate_sample_doc = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="Sample Document"),blank=True, null=True)
+
 
     # --- Proposal Cost Breakdown Section ---
 
