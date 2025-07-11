@@ -122,6 +122,8 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
     # Assume nested serializers are defined elsewhere
     collaborators = CollaboratorSerializer(many=True, read_only=True)
     milestones = serializers.SerializerMethodField()
+    service_name = serializers.SerializerMethodField()
+ 
     # ... other fields/nested serializers ...
 
     class Meta:
@@ -129,7 +131,7 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = [
             'id', 'applicant', 'form_id', 'proposal_id',
-            'created_at', 'updated_at',
+            'created_at', 'updated_at','service_name',
         ]
 
  
@@ -423,8 +425,6 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
             })
         
         return data
-
-
 
     def get_milestones(self, obj):
             # You must return serialized data for milestones!
