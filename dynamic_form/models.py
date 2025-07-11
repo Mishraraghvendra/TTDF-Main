@@ -112,9 +112,9 @@ class FormSubmission(models.Model):
     applicant_type    = models.CharField(max_length=20, choices=APPLICANT_TYPE_CHOICES,blank=True, null=True)
     passport_file     = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="passport"),blank=True, null=True)
     resume_upload     = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="resume"),blank=True, null=True)
-    subject           = models.CharField(max_length=255,blank=True, null=True)
+    subject           = models.CharField(max_length=1000,blank=True, null=True)
     org_type          = models.CharField(max_length=255,blank=True, null=True)
-    description       = models.CharField(max_length=255,blank=True, null=True)
+    description       = models.CharField(max_length=1000,blank=True, null=True)
     
 
     # # ———2. Collaborator Details ————————
@@ -192,7 +192,7 @@ class FormSubmission(models.Model):
 
     # ---11 Proposal Summary Section ---
     proposed_village = models.CharField(max_length=255,choices=Village_CHOICES ,blank=True, null=True)
-    use_case = models.CharField(max_length=255, blank=True, null=True)
+    use_case = models.CharField(max_length=1000, blank=True, null=True)
     proposal_abstract = models.TextField(blank=True, null=True)
     potential_impact = models.TextField(blank=True, null=True)
     end_to_end_solution = models.TextField(blank=True, null=True)
@@ -677,7 +677,7 @@ class Collaborator(models.Model):
     contact_person_name_collab = models.CharField(max_length=200, blank=True, null=True)
     organization_name_collab = models.CharField(max_length=200, blank=True, null=True)
     organization_type_collab = models.CharField(max_length=50, blank=True, null=True)
-    ttdf_company = models.CharField(max_length=30,choices=TTDF_COMPANY_CHOICES,blank=True,null=True)
+    ttdf_company = models.CharField(max_length=1000,choices=TTDF_COMPANY_CHOICES,blank=True,null=True)
     pan_file_collb = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="collaborator/pan"), blank=True, null=True)
     pan_file_name_collab = models.CharField(max_length=255, blank=True, null=True)
     mou_file_collab = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="collaborator/mou"), blank=True, null=True)
@@ -688,7 +688,7 @@ class Collaborator(models.Model):
 
 class Equipment(models.Model):
     form_submission = models.ForeignKey(FormSubmission, related_name="equipments", on_delete=models.CASCADE)
-    item = models.CharField(max_length=255, blank=True, null=True)
+    item = models.CharField(max_length=1000, blank=True, null=True)
     unit_price = models.DecimalField(max_digits=12, decimal_places=5, blank=True, null=True)
     quantity = models.PositiveIntegerField(blank=True, null=True)
     amount = models.DecimalField(max_digits=12, decimal_places=5, blank=True, null=True)
