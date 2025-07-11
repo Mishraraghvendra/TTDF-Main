@@ -455,6 +455,7 @@ class FormSubmission(models.Model):
     # ——— 5. Collaborator Details ————————
     # collaborator_name  = models.CharField(max_length=200,blank=True, null=True)
     # collaborator_type  = models.CharField(max_length=50,blank=True, null=True)
+    
     # collaborator_mou   = models.FileField(upload_to='mou/',blank=True, null=True)
     # consortiumPartner =  models.CharField(max_length=200,blank=True, null=True)
 
@@ -660,9 +661,19 @@ TTDF_COMPANY_CHOICES = [
     ('academic', 'Academic institutions'),
     ('rnd_section8_govt', 'R&D institutions, Section 8 companies / Societies, Central & State government entities / PSUs /Autonomous Bodies/SPVs / Limited liability partnerships'),
 ]
+ 
+
+COLLABORATOR_CHOICES=[
+
+('principalApplicant','principalApplicant'),
+('consortiumPartner','principalApplicant'),
+
+]
+
 
 class Collaborator(models.Model):
     form_submission = models.ForeignKey(FormSubmission, related_name="collaborators", on_delete=models.CASCADE)
+    collaborator_type = models.CharField(max_length=50, choices=COLLABORATOR_CHOICES,blank=True, null=True)
     contact_person_name_collab = models.CharField(max_length=200, blank=True, null=True)
     organization_name_collab = models.CharField(max_length=200, blank=True, null=True)
     organization_type_collab = models.CharField(max_length=50, blank=True, null=True)
@@ -706,6 +717,7 @@ class SubShareHolder(models.Model):
     share_percentage = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
     identity_document = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="subshareholder/docs"), blank=True, null=True)
     identity_document_name = models.CharField(max_length=255, blank=True, null=True)
+    organization_name_subholder = models.CharField(max_length=200, blank=True, null=True)
 
 
 
