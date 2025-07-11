@@ -553,16 +553,32 @@ class FormSubmission(models.Model):
         # Use the last 6 digits of the UUID for uniqueness, or use the whole UUID if you prefer
         return f"FORM/{year}/{str(self.pk)[-6:].upper()}"
 
+    # def generate_proposal_id(self):
+    #     year = datetime.now().year
+    #     service_name = self.service.name.upper() if self.service and self.service.name else "GENERAL"
+    #     service_name = "".join(c for c in service_name if c.isalnum())
+    #     count = FormSubmission.objects.filter(
+    #         status=self.SUBMITTED,
+    #         created_at__year=year,
+    #         service=self.service
+    #     ).count() + 1
+    #     return f"TTDF/{service_name}/{year}/{count:05d}"
+
     def generate_proposal_id(self):
         year = datetime.now().year
-        service_name = self.service.name.upper() if self.service and self.service.name else "GENERAL"
-        service_name = "".join(c for c in service_name if c.isalnum())
+        # Use template title instead of service name
+        template_name = self.template.title.upper() if self.template and self.template.title else "GENERAL"
+        # Remove non-alphanumeric characters for ID safety
+        template_name = "".join(c for c in template_name if c.isalnum())
+        # Count per template for the year (not per service)
         count = FormSubmission.objects.filter(
             status=self.SUBMITTED,
             created_at__year=year,
-            service=self.service
+            template=self.template
         ).count() + 1
-        return f"TTDF/{service_name}/{year}/{count:05d}"
+        return f"TTDF/{template_name}/{year}/{count:05d}"
+
+
 
     def save(self, *args, **kwargs):
         is_new_submission = not self.pk  # True if this is a new object
