@@ -119,19 +119,22 @@ class CollaboratorSerializer(serializers.ModelSerializer):
 
 
 class FormSubmissionSerializer(serializers.ModelSerializer):
-    # Assume nested serializers are defined elsewhere
+    
     collaborators = CollaboratorSerializer(many=True, read_only=True)
-    milestones = serializers.SerializerMethodField()
+    milestones = MilestoneSerializer(many=True, read_only=True)
+    applicant = UserShortSerializer(read_only=True)
+    profile = serializers.SerializerMethodField()
     service_name = serializers.SerializerMethodField()
- 
-    # ... other fields/nested serializers ...
+    last_updated = serializers.SerializerMethodField()
+    create_date = serializers.SerializerMethodField()
 
     class Meta:
         model = FormSubmission
         fields = '__all__'
         read_only_fields = [
             'id', 'applicant', 'form_id', 'proposal_id',
-            'created_at', 'updated_at','service_name',
+            'created_at', 'updated_at',
+            'service_name', 'last_updated', 'create_date'
         ]
 
  
