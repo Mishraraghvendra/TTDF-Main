@@ -42,7 +42,6 @@ class FormTemplate(models.Model):
         return self.title
 
 
-
 def upload_to_dynamic(instance, filename, subfolder=None):
     # Handles both direct file fields and related models if needed
     service = getattr(instance, 'service', None)
@@ -621,8 +620,6 @@ class FormSubmission(models.Model):
     def __str__(self):
         return f"{self.form_id} ({self.get_status_display()})"
 
-
-
 class IPRDetails(models.Model):
     submission = models.ForeignKey(FormSubmission, related_name='iprdetails', on_delete=models.CASCADE)
     name = models.CharField(max_length=255, help_text="Unique name or label for this form entry",blank=True, null=True)
@@ -678,14 +675,12 @@ TTDF_COMPANY_CHOICES = [
     ('rnd_section8_govt', 'R&D institutions, Section 8 companies / Societies, Central & State government entities / PSUs /Autonomous Bodies/SPVs / Limited liability partnerships'),
 ]
  
-
 COLLABORATOR_CHOICES=[
 
 ('principalApplicant','principalApplicant'),
 ('consortiumPartner','principalApplicant'),
 
 ]
-
 
 class Collaborator(models.Model):
     form_submission = models.ForeignKey(FormSubmission, related_name="collaborators", on_delete=models.CASCADE)
@@ -698,9 +693,6 @@ class Collaborator(models.Model):
     pan_file_name_collab = models.CharField(max_length=255, blank=True, null=True)
     mou_file_collab = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="collaborator/mou"), blank=True, null=True)
     mou_file_name_collab = models.CharField(max_length=255, blank=True, null=True)
-
-
-
 
 class Equipment(models.Model):
     form_submission = models.ForeignKey(FormSubmission, related_name="equipments", on_delete=models.CASCADE)
@@ -734,12 +726,6 @@ class SubShareHolder(models.Model):
     identity_document = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="subshareholder/docs"), blank=True, null=True)
     identity_document_name = models.CharField(max_length=255, blank=True, null=True)
     organization_name_subholder = models.CharField(max_length=200, blank=True, null=True)
-
-
-
-
-
-
 
 class FormPage(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
