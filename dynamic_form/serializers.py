@@ -75,6 +75,7 @@ class FullProfileSerializer(serializers.ModelSerializer):
         model = Profile
         exclude = ["id", "user"]
 
+
 class CollaboratorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Collaborator
@@ -114,8 +115,6 @@ class CollaboratorSerializer(serializers.ModelSerializer):
                     f"Collaborator with PAN '{pan_name}' already exists for village '{proposed_village}'."
                 )
         return data
-
-
 
 
 class FormSubmissionSerializer(serializers.ModelSerializer):
@@ -428,8 +427,6 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
             })
         
         return data
-
-
 
     def get_milestones(self, obj):
             # You must return serialized data for milestones!

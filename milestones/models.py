@@ -254,6 +254,8 @@ class Milestone(models.Model):
         from .models import MilestoneHistory
         MilestoneHistory.objects.create(milestone=self, snapshot=safe_data)
 
+
+
 class DocumentStatus(models.TextChoices):
     PENDING = 'pending', 'Pending'
     ACCEPTED = 'accepted', 'Accepted'
