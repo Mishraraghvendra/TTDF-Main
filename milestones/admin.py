@@ -45,10 +45,15 @@ class SubMilestoneInline(admin.TabularInline):
 
 @admin.register(Milestone)
 class MilestoneAdmin(admin.ModelAdmin):
-    list_display = ('id', 'title', 'proposal', 'created_by', 'created_at')
+    list_display = ('id','get_proposal_id','title', 'proposal', 'created_by', 'created_at')
     inlines = [MilestoneDocumentInline, SubMilestoneInline, MilestoneHistoryInline]
     search_fields = ('title', 'proposal__proposal_id')
     list_filter = ('created_at',)
+
+    def get_proposal_id(self, obj):
+        return obj.proposal.proposal_id if obj.proposal and obj.proposal.proposal_id else 'N/A'
+    get_proposal_id.short_description = 'Proposal ID'
+    get_proposal_id.admin_order_field = 'proposal__proposal_id'
 
 @admin.register(SubMilestone)
 class SubMilestoneAdmin(admin.ModelAdmin):

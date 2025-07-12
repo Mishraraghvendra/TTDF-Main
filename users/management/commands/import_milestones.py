@@ -9,7 +9,7 @@ def parse_int(val):
     except Exception:
         return 0
 
-class Command(BaseCommand):
+class Command(BaseCommand): 
     help = "Import milestones (and submilestones) from CSV proposal-wise, putting Activities in activities field ONLY."
 
     def add_arguments(self, parser):
@@ -28,6 +28,7 @@ class Command(BaseCommand):
                 revised_time_required = parse_int(row.get('Time (Months)', 0))
                 revised_contri_applicant = parse_int(row.get('Applicant Contribution', 0))
                 revised_grant_from_ttdf = parse_int(row.get('TTDF Grants', 0))
+                funds_requested= parse_int(row.get('Funds Requested', 0))
 
                 if not (proposal_id and title):
                     self.stdout.write(self.style.ERROR(f"[Row {idx+2}] Missing proposal ID or milestone title. Skipping."))
