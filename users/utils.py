@@ -45,6 +45,7 @@ def upsert_profile_and_user_from_submission(user, data, files=None):
        "streetVillage": "street_village",
        "street_village": "street_village",
        "city": "city",
+       "dob": "dob",
        "country": "country",
        "state": "state",
        "pincode": "pincode",
@@ -55,8 +56,8 @@ def upsert_profile_and_user_from_submission(user, data, files=None):
        "website": "website_link",
        "website_link": "website_link",
        "companyAsPerCfp": "company_as_per_guidelines",
-       "registrationCertificate": "organization_registration_certificate",
-       "shareHoldingPattern": "share_holding_pattern",
+       "organization_registration_certificate": "organization_registration_certificate",
+       "share_holding_pattern": "share_holding_pattern",
        "dsirCertificate": "dsir_certificate",
        "tanPanCin": "tan_pan_cin",
        "organizationType": "applicant_type",
@@ -65,6 +66,7 @@ def upsert_profile_and_user_from_submission(user, data, files=None):
        "mobile": "mobile",
        "gender": "gender",
        "organization": "organization",
+       "is_organization_domestic": "is_organization_domestic"
    }
 
    profile_data = data.get("profile", {})

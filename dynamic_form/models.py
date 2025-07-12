@@ -293,6 +293,7 @@ class FormSubmission(models.Model):
     )
 
     equipment_overhead_sample_doc = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="Sample Document"),blank=True, null=True)
+    
 
     # --- Income Estimate Section ---
     income_estimate = models.JSONField(
@@ -716,7 +717,7 @@ class RDStaff(models.Model):
     email = models.EmailField(blank=True, null=True)
     highest_qualification = models.CharField(max_length=255, blank=True, null=True)
     mobile = models.CharField(max_length=20, blank=True, null=True)
-    resume = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="rdstaff/resume"), blank=True, null=True)
+    rd_staf_resume = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="rdstaff/resume"), blank=True, null=True)
     epf_details = models.CharField(max_length=255, blank=True, null=True)
 
 class SubShareHolder(models.Model):
