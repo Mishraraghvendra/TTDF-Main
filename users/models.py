@@ -161,7 +161,8 @@ class Profile(models.Model):
 
     companyAsPerCfp = models.CharField(max_length=1000,choices=TTDF_COMPANY_CHOICES,blank=True,null=True)
     individualPanAttachment =models.FileField(upload_to='Applicant Pan', blank=True, null=True)
-    
+    individualPAN = models.CharField(max_length=50, blank=True, null=True)
+
     tan_pan_cin = models.FileField(upload_to='org/tan_pan_cin/', blank=True, null=True)
     def __str__(self):
         return f"Profile of {self.user.email}"

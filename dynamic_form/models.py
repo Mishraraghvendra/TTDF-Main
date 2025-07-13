@@ -42,16 +42,53 @@ class FormTemplate(models.Model):
         return self.title
 
 
+# def upload_to_dynamic(instance, filename, subfolder=None):
+#     # Handles both direct file fields and related models if needed
+#     service = getattr(instance, 'service', None)
+#     if not service and hasattr(instance, 'form_submission'):
+#         service = getattr(instance.form_submission, 'service', None)
+#     service_name = getattr(service, 'name', 'unknown') if service else "unknown"
+#     service_name = service_name.replace(" ", "_").lower()
+#     folder = subfolder or "docs"
+#     return f"{folder}/{service_name}/{filename}"
+
 def upload_to_dynamic(instance, filename, subfolder=None):
-    # Handles both direct file fields and related models if needed
     service = getattr(instance, 'service', None)
     if not service and hasattr(instance, 'form_submission'):
         service = getattr(instance.form_submission, 'service', None)
     service_name = getattr(service, 'name', 'unknown') if service else "unknown"
     service_name = service_name.replace(" ", "_").lower()
     folder = subfolder or "docs"
-    return f"{folder}/{service_name}/{filename}"
+    # Get proposal_id
+    proposal_id = getattr(instance, 'proposal_id', None)
+    if not proposal_id and hasattr(instance, 'form_submission'):
+        proposal_id = getattr(instance.form_submission, 'proposal_id', None)
+    if not proposal_id:
+        proposal_id = "draft"
+    return f"services/{service_name}/{proposal_id}/{folder}/{filename}"
 
+
+
+import os
+from django.core.files.base import File
+
+def move_file_to_proposal_folder(file_field, instance, old_path, new_path):
+    """
+    Move a file from old_path to new_path using Django's storage system,
+    then update the file_field on the instance.
+    """
+    if not file_field or not old_path or not new_path or old_path == new_path:
+        return False
+    storage = file_field.storage
+    if not storage.exists(old_path):
+        return False
+    # Read file content
+    with storage.open(old_path, 'rb') as f:
+        content = File(f)
+        storage.save(new_path, content)
+    storage.delete(old_path)
+    file_field.name = new_path  # update field value (unsaved)
+    return True
 
 
 class FormSubmission(models.Model):
@@ -580,6 +617,36 @@ class FormSubmission(models.Model):
 
 
 
+    # def save(self, *args, **kwargs):
+    #     is_new_submission = not self.pk  # True if this is a new object
+    #     was_draft = False
+
+    #     if self.status == self.SUBMITTED:
+    #         self.committee_assigned = True
+
+    #     if not is_new_submission:
+    #         try:
+    #             existing = FormSubmission.objects.get(pk=self.pk)
+    #             was_draft = (existing.status == self.DRAFT)
+    #         except FormSubmission.DoesNotExist:
+    #             pass
+
+    #     if not self.form_id:
+    #         self.form_id = self.generate_form_id()
+
+    # # On first submission, generate a proposal_id if it's not already set
+    #     if self.status == self.SUBMITTED and not self.proposal_id:
+    #         self.proposal_id = self.generate_proposal_id()
+
+    # # Save the object to the database
+    #     super().save(*args, **kwargs)
+
+    # # Generate PDF when the status changes to SUBMITTED from DRAFT or it's a new submission
+    #     if self.status == self.SUBMITTED and (is_new_submission or was_draft):
+    #         pdf_file = generate_submission_pdf(self)
+    #         filename = f"{self.proposal_id or self.form_id}.pdf"
+    #         self.applicationDocument.save(filename, pdf_file, save=True)
+
     def save(self, *args, **kwargs):
         is_new_submission = not self.pk  # True if this is a new object
         was_draft = False
@@ -597,18 +664,71 @@ class FormSubmission(models.Model):
         if not self.form_id:
             self.form_id = self.generate_form_id()
 
-    # On first submission, generate a proposal_id if it's not already set
+        # On first submission, generate a proposal_id if it's not already set
         if self.status == self.SUBMITTED and not self.proposal_id:
             self.proposal_id = self.generate_proposal_id()
 
-    # Save the object to the database
+        # ---- 1. Save the object to the database (MUST DO THIS FIRST!) ----
         super().save(*args, **kwargs)
 
-    # Generate PDF when the status changes to SUBMITTED from DRAFT or it's a new submission
+        # ---- 2. If just submitted, move files out of /draft/ to final location ----
         if self.status == self.SUBMITTED and (is_new_submission or was_draft):
+            self.move_all_files_to_proposal_folder()
+            # Save again to update file fields with new paths
+            super().save(update_fields=[f.name for f in self._meta.fields if isinstance(f, models.FileField)])
+
+            # ---- 3. Now, generate the PDF (so PDF also ends up in correct folder) ----
             pdf_file = generate_submission_pdf(self)
             filename = f"{self.proposal_id or self.form_id}.pdf"
             self.applicationDocument.save(filename, pdf_file, save=True)
+
+
+
+    def move_all_files_to_proposal_folder(self):
+        file_fields = [
+            'pan_file', 'passport_file', 'resume_upload', 'gantt_chart', 'technical_proposal',
+            'proposal_presentation', 'budget_estimate_sample_doc', 'equipment_overhead_sample_doc',
+            'income_estimate_sample_doc', 'presentation', 'dpr', 'applicationDocument'
+        ]
+        for field in file_fields:
+            file = getattr(self, field, None)
+            if file and file.name and '/draft/' in file.name:
+                new_path = file.name.replace('/draft/', f'/{self.proposal_id}/')
+                move_file_to_proposal_folder(file, self, file.name, new_path)
+                setattr(self, field, new_path)
+
+        relateds = [
+            (self.fund_loan_documents.all(), ['document']),
+            (self.iprdetails.all(), ['t_support_letter']),
+            (self.collaborators.all(), ['pan_file_collb', 'mou_file_collab']),
+            (self.rdstaff.all(), ['rd_staf_resume']),
+            (self.shareholders.all(), ['identity_document']),
+            (self.sub_shareholders.all(), ['identity_document']),
+        ]
+        for queryset, fields in relateds:
+            for obj in queryset:
+                for field in fields:
+                    file = getattr(obj, field, None)
+                    if file and file.name and '/draft/' in file.name:
+                        new_path = file.name.replace('/draft/', f'/{self.proposal_id}/')
+                        move_file_to_proposal_folder(file, obj, file.name, new_path)
+                        setattr(obj, field, new_path)
+                        obj.save(update_fields=[field])
+
+    # The file moving helper
+    def move_file_to_proposal_folder(file_field, instance, old_path, new_path):
+        storage = file_field.storage
+        if not storage.exists(old_path) or old_path == new_path:
+            return False
+        from django.core.files.base import File
+        with storage.open(old_path, 'rb') as f:
+            content = File(f)
+            storage.save(new_path, content)
+        storage.delete(old_path)
+        file_field.name = new_path
+        return True
+
+
 
     def can_edit(self):
         now = datetime.now()
