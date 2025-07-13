@@ -7,6 +7,13 @@ from django.contrib.auth.models import (
 from django.conf import settings
 
 
+TTDF_COMPANY_CHOICES = [
+    ('domestic_company', 'Domestic Company(ies) with focus on telecom R&D, Use case development'),
+    ('startup_msme', 'Startups / MSMEs'),
+    ('academic', 'Academic institutions'),
+    ('rnd_section8_govt', 'R&D institutions, Section 8 companies / Societies, Central & State government entities / PSUs /Autonomous Bodies/SPVs / Limited liability partnerships'),
+]
+
 class UserManager(BaseUserManager):
     def _validate_email_mobile(self, email, mobile):
         if not email:
@@ -152,6 +159,8 @@ class Profile(models.Model):
     id_type = models.CharField(max_length=50, blank=True, null=True)
     id_number = models.CharField(max_length=50, blank=True, null=True)
 
+    companyAsPerCfp = models.CharField(max_length=1000,choices=TTDF_COMPANY_CHOICES,blank=True,null=True)
+    individualPanAttachment =models.FileField(upload_to='Applicant Pan', blank=True, null=True)
     
     tan_pan_cin = models.FileField(upload_to='org/tan_pan_cin/', blank=True, null=True)
     def __str__(self):

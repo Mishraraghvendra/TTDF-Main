@@ -69,7 +69,9 @@ def upsert_profile_and_user_from_submission(user, data, files=None):
        "mobile": "mobile",
        "gender": "gender",
        "organization": "organization",
-       "is_organization_domestic": "is_organization_domestic"
+       "is_organization_domestic": "is_organization_domestic",
+       "individualPanAttachment":"individualPanAttachment",
+       "companyAsPerCfp":"companyAsPerCfp",
    }
 
    profile_data = data.get("profile", {})
