@@ -782,7 +782,7 @@ class FundLoanDocument(models.Model):
         related_name="fund_loan_documents"
     )
     document = models.FileField(
-        upload_to=partial(upload_to_dynamic, subfolder="resume"),
+        upload_to=partial(upload_to_dynamic, subfolder="Loan"),
         blank=True,
         null=True
     )

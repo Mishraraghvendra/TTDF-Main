@@ -72,6 +72,7 @@ def upsert_profile_and_user_from_submission(user, data, files=None):
        "is_organization_domestic": "is_organization_domestic",
        "individualPanAttachment":"individualPanAttachment",
        "companyAsPerCfp":"companyAsPerCfp",
+       "individualPAN":"individualPAN",
    }
 
    profile_data = data.get("profile", {})
