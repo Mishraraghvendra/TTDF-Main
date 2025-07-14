@@ -330,7 +330,7 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
                 if isinstance(val, str) and val in files:
                     rec[field] = files[val]
 
-    def get_service_name(self, obj):
+    def get_service_name(self, obj): 
         return obj.service.name if obj.service else None
 
     def get_last_updated(self, obj):

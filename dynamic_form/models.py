@@ -848,6 +848,18 @@ class SubShareHolder(models.Model):
     identity_document_name = models.CharField(max_length=255, blank=True, null=True)
     organization_name_subholder = models.CharField(max_length=200, blank=True, null=True)
 
+
+class TeamMember(models.Model):
+    form_submission = models.ForeignKey(FormSubmission, related_name="team_members", on_delete=models.CASCADE)
+    name = models.CharField(max_length=255)
+    resumefile = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="Team Resumes/"), blank=True, null=True)
+    resumetext = models.TextField(blank=True, null=True)
+    otherdetails = models.TextField(blank=True, null=True)
+
+
+
+
+
 class FormPage(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     form_template = models.ForeignKey(FormTemplate, related_name='pages', on_delete=models.CASCADE)

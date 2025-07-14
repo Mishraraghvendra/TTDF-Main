@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import FormTemplate, FormSubmission, IPRDetails, FundLoanDocument, Collaborator, Equipment, RDStaff, ShareHolder, SubShareHolder
+from .models import FormTemplate, FormSubmission, IPRDetails, FundLoanDocument, Collaborator, Equipment, RDStaff, ShareHolder, SubShareHolder,TeamMember
 from milestones.serializers import MilestoneSerializer
 from milestones.models import Milestone
 from users.serializers import ProfileSerializer
@@ -117,6 +117,13 @@ class CollaboratorSerializer(serializers.ModelSerializer):
         return data
 
 
+
+class TeamMemberSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TeamMember
+        fields = ['id', 'name', 'resumefile', 'resumetext', 'otherdetails']
+
+
 class FormSubmissionSerializer(serializers.ModelSerializer):
     
     collaborators = CollaboratorSerializer(many=True, read_only=True)
@@ -126,6 +133,7 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
     service_name = serializers.SerializerMethodField()
     last_updated = serializers.SerializerMethodField()
     create_date = serializers.SerializerMethodField()
+    team_members = TeamMemberSerializer(many=True, read_only=True)
 
     class Meta:
         model = FormSubmission
@@ -142,12 +150,12 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
     def to_internal_value(self, data):
         import json, re
         json_fields = [
-            'fund_loan_documents', 'iprdetails', 'collaborators', 'equipments',
+            'fund_loan_documents', 'teamMembers','iprdetails', 'collaborators', 'equipments',
             'shareholders', 'rdstaff', 'sub_shareholders', 'milestones'
         ]
-        print("=== PROCESSING REQUEST DATA ===")
-        print(f"Data type: {type(data)}")
-        print(f"Available keys: {list(data.keys())[:20]}...")
+        # print("=== PROCESSING REQUEST DATA ===")
+        # print(f"Data type: {type(data)}")
+        # print(f"Available keys: {list(data.keys())[:20]}...")
 
         if not hasattr(self, '_nested_data'):
             self._nested_data = {}
@@ -563,14 +571,14 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
         sub_shareholders = nested_data.get('sub_shareholders', [])
         milestones = nested_data.get('milestones', [])
 
-        print(f"fund_loan_documents: {len(fund_loan_documents)} items")
-        print(f"iprdetails: {len(iprdetails)} items")
-        print(f"collaborators: {len(collaborators)} items")
-        print(f"equipments: {len(equipments)} items")
-        print(f"shareholders: {len(shareholders)} items")
-        print(f"rdstaff: {len(rdstaff)} items")
-        print(f"sub_shareholders: {len(sub_shareholders)} items")
-        print(f"milestones: {len(milestones)} items")
+        # print(f"fund_loan_documents: {len(fund_loan_documents)} items")
+        # print(f"iprdetails: {len(iprdetails)} items")
+        # print(f"collaborators: {len(collaborators)} items")
+        # print(f"equipments: {len(equipments)} items")
+        # print(f"shareholders: {len(shareholders)} items")
+        # print(f"rdstaff: {len(rdstaff)} items")
+        # print(f"sub_shareholders: {len(sub_shareholders)} items")
+        # print(f"milestones: {len(milestones)} items")
 
         # Set applicant
         validated_data['applicant'] = request.user
@@ -669,6 +677,20 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
                 print(f"❌ Error creating Milestone: {e}")
 
         print("=== FINISHED CREATING OBJECTS ===")
+
+        team_members = nested_data.get('teamMembers', [])
+        self._inject_file_objects(team_members, ['resumefile'])
+        for tm in team_members:
+            TeamMember.objects.create(
+                form_submission=submission,   # make sure 'submission' is your created FormSubmission instance
+                name=tm.get('name', ''),
+                resumefile=tm.get('resumefile', None),
+                resumetext=tm.get('resumetext', ''),
+                otherdetails=tm.get('otherdetails', '')
+        )
+
+
+
         return submission
 
     def update(self, instance, validated_data):
@@ -794,6 +816,22 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
                     print(f"❌ Error updating Milestone: {e}")
 
         print("=== FINISHED UPDATING OBJECTS ===")
+
+        
+        team_members = nested_data.get('teamMembers', [])
+        self._inject_file_objects(team_members, ['resumefile'])
+        instance.team_members.all().delete()
+        for tm in team_members:
+            TeamMember.objects.create(
+                form_submission=instance,
+                name=tm.get('name', ''),
+                resumefile=tm.get('resumefile', None),
+                resumetext=tm.get('resumetext', ''),
+                otherdetails=tm.get('otherdetails', '')
+            )
+
+
+
         return instance
     
 
