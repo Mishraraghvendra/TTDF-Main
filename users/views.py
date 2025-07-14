@@ -34,42 +34,117 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
+# class RegisterApplicantView(generics.CreateAPIView):
+#     serializer_class   = ApplicantRegistrationSerializer
+#     permission_classes = [AllowAny]
+
+#     def create(self, request, *args, **kwargs):
+#         try:
+#             # 1) validate & save the new user
+#             serializer = self.get_serializer(data=request.data)
+#             serializer.is_valid(raise_exception=True)
+#             user = serializer.save()
+
+#             # 2) assign default Role "Applicant"
+#             default_role, _ = Role.objects.get_or_create(name="Applicant")
+#             UserRole.objects.create(user=user, role=default_role)
+#             user.is_auth_user = True
+#             user.save(update_fields=["is_auth_user"])
+
+#             # 3) issue JWTs
+#             refresh = RefreshToken.for_user(user)
+
+#             # 4) build user payload
+#             profile   = getattr(user, 'profile', None)
+#             image_url = None
+#             if profile and profile.profile_image:
+#                 image_url = request.build_absolute_uri(profile.profile_image.url)
+
+#             user_data = {
+#                 "id":            user.id,
+#                 "name":          user.full_name,
+#                 "email":         user.email,
+#                 "gender":        user.get_gender_display(),
+#                 "mobile":        user.mobile,
+#                 "organization":  user.organization,
+#                 "role":          default_role.name,
+#                 "profile_image": image_url,
+#                 "created_at":    user.created_at.isoformat(),
+#                 "is_verified":   user.is_verified,
+#                 "is_active":     user.is_active,
+#             }
+
+#             return Response({
+#                 "status":           "success",
+#                 "response_message": "User registered successfully",
+#                 "user":             user_data,
+#                 "access_token":     str(refresh.access_token),
+#                 "refresh_token":    str(refresh),
+#             }, status=status.HTTP_201_CREATED)
+
+#         except DRFValidationError as exc:
+#             return Response({
+#                 "status":           "error",
+#                 "response_message": exc.detail
+#             }, status=status.HTTP_400_BAD_REQUEST)
+
+#         except DjangoValidationError as exc:
+#             return Response({
+#                 "status":           "error",
+#                 "response_message": exc.message_dict
+#             }, status=status.HTTP_400_BAD_REQUEST)
+
+#         except Exception:
+#             return Response({
+#                 "status":           "error",
+#                 "response_message": "Registration failed due to an internal error."
+#             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+from rest_framework import generics, status
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.exceptions import ValidationError as DRFValidationError
+from django.core.exceptions import ValidationError as DjangoValidationError
+from .serializers import ApplicantRegistrationSerializer
+from .models import Role, UserRole  # Update import as per your project
+
 class RegisterApplicantView(generics.CreateAPIView):
-    serializer_class   = ApplicantRegistrationSerializer
+    serializer_class = ApplicantRegistrationSerializer
     permission_classes = [AllowAny]
 
     def create(self, request, *args, **kwargs):
         try:
-            # 1) validate & save the new user
             serializer = self.get_serializer(data=request.data)
             serializer.is_valid(raise_exception=True)
             user = serializer.save()
 
-            # 2) assign default Role "Applicant"
+            # Assign default Role "Applicant"
             default_role, _ = Role.objects.get_or_create(name="Applicant")
             UserRole.objects.create(user=user, role=default_role)
             user.is_auth_user = True
             user.save(update_fields=["is_auth_user"])
 
-            # 3) issue JWTs
+            # Issue JWTs
             refresh = RefreshToken.for_user(user)
 
-            # 4) build user payload
-            profile   = getattr(user, 'profile', None)
+            # Build user payload
+            profile = getattr(user, 'profile', None)
             image_url = None
-            if profile and profile.profile_image:
+            if profile and getattr(profile, 'profile_image', None):
                 image_url = request.build_absolute_uri(profile.profile_image.url)
 
             user_data = {
                 "id":            user.id,
                 "name":          user.full_name,
                 "email":         user.email,
-                "gender":        user.get_gender_display(),
+                "gender":        user.get_gender_display() if hasattr(user, 'get_gender_display') else user.gender,
                 "mobile":        user.mobile,
                 "organization":  user.organization,
                 "role":          default_role.name,
                 "profile_image": image_url,
-                "created_at":    user.created_at.isoformat(),
+                "created_at":    user.created_at.isoformat() if hasattr(user, 'created_at') else None,
                 "is_verified":   user.is_verified,
                 "is_active":     user.is_active,
             }
@@ -83,9 +158,23 @@ class RegisterApplicantView(generics.CreateAPIView):
             }, status=status.HTTP_201_CREATED)
 
         except DRFValidationError as exc:
+            errors = exc.detail
+            message = ""
+            if isinstance(errors, dict):
+                for field, msgs in errors.items():
+                    if isinstance(msgs, list):
+                        for msg in msgs:
+                            message += f"{field.capitalize()}: {msg} "
+                    else:
+                        message += f"{field.capitalize()}: {msgs} "
+            elif isinstance(errors, list):
+                message = " ".join(str(m) for m in errors)
+            else:
+                message = str(errors)
+
             return Response({
                 "status":           "error",
-                "response_message": exc.detail
+                "response_message": message.strip()
             }, status=status.HTTP_400_BAD_REQUEST)
 
         except DjangoValidationError as exc:
@@ -94,11 +183,12 @@ class RegisterApplicantView(generics.CreateAPIView):
                 "response_message": exc.message_dict
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        except Exception:
+        except Exception as e:
             return Response({
                 "status":           "error",
                 "response_message": "Registration failed due to an internal error."
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
 class LoginView(APIView):

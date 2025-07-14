@@ -111,6 +111,13 @@ class FormSubmissionAdmin(admin.ModelAdmin):
                 'income_estimate',
             )
         }),
+
+        ("Equipment Overhead", {
+            'fields': (
+                'equipment_overhead',
+                'equipment_overhead_sample_doc',
+            )
+        }),
         ("Proposal Cost Breakdown", {
             'fields': (
                 'network_core',

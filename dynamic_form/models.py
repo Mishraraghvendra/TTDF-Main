@@ -759,7 +759,11 @@ class IPRDetails(models.Model):
     ip_proposal = models.TextField(blank=True, null=True)
     regulatory_approvals = models.TextField(blank=True, null=True)
     status_approvals = models.TextField(blank=True, null=True)
-    proof_of_status = models.TextField(blank=True, null=True)
+    proof_of_status = models.FileField(
+        upload_to=partial(upload_to_dynamic, subfolder="Proof of Status"),
+        blank=True,
+        null=True
+    )
 
     # Telecom Service Provider
     t_name = models.CharField(max_length=255, blank=True, null=True)
