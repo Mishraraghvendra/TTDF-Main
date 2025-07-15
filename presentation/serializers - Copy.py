@@ -129,7 +129,12 @@ class AdminPresentationListSerializer(serializers.ModelSerializer):
         return getattr(obj.applicant, 'organization', '') or ''
  
     def get_funds_requested(self, obj):
-        return getattr(obj.proposal, 'funds_requested', None)
+        milestones = obj.milestones.order_by('-created_at')
+        for m in milestones:
+            if m.funds_requested not in (None, 0):
+                return m.funds_requested
+        return None
+ 
  
     def get_evaluation_status(self, obj):
         if obj.is_evaluation_completed:
@@ -279,7 +284,11 @@ class PersonalInterviewSerializer(serializers.ModelSerializer):
         return latest.grant_from_ttdf if latest else None
  
     def get_funds_requested(self, obj):
-        return getattr(obj.proposal, 'funds_requested', None)
+        milestones = obj.milestones.order_by('-created_at')
+        for m in milestones:
+            if m.funds_requested not in (None, 0):
+                return m.funds_requested
+        return None
  
     def get_fundsGranted(self, obj):
         latest = obj.milestones.order_by('-created_at').first()
@@ -574,19 +583,27 @@ class UltraFastFormSubmissionSerializer(serializers.ModelSerializer):
     average_marks = serializers.SerializerMethodField()
     total_evaluators = serializers.SerializerMethodField()
     presentation = serializers.SerializerMethodField()
-    funds_requested = serializers.SerializerMethodField()
+    fundsRequested = serializers.SerializerMethodField()
 
     class Meta:
         model = FormSubmission
         fields = [
             'id', 'call', 'orgType', 'orgName', 'subject', 'description',
             'status', 'submissionDate', 'contactPerson', 'contactEmail',
-            'average_marks', 'total_evaluators', 'presentation','funds_requested'
+            'average_marks', 'total_evaluators', 'presentation','fundsRequested'
         ]
 
-    def funds_requested(self, obj):
-        return obj.funds_requested
- 
+
+    def get_fundsRequested(self, obj):
+        milestones = obj.milestones.order_by('-created_at')
+        for m in milestones:
+            if m.funds_requested not in (None, 0):
+                return m.funds_requested
+        if hasattr(obj, 'funds_requested'):
+            return obj.funds_requested
+        return None
+
+
     def get_orgName(self, obj):
         # Use prefetched applicant
         return getattr(obj.applicant, 'organization', '')

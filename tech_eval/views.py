@@ -255,9 +255,8 @@ class TechnicalEvaluationRoundViewSet(viewsets.ModelViewSet):
                     'subject': proposal_data.get('subject', 'N/A'),
                     'description': proposal_data.get('description', 'N/A')[:200] + ('...' if len(proposal_data.get('description', '')) > 200 else ''),
                     'fundsRequested': (
-                        milestone_data.get(item.proposal.id if item.proposal else None, 0) or 
-                        getattr(item.proposal, 'grants_from_ttdf', 0) if item.proposal else 0
-                    ),
+                            getattr(item.proposal, 'funds_requested', 0) if item.proposal else 0
+                        ),
                     'submissionDate': item.created_at.isoformat() if item.created_at else None,
                     'contactPerson': proposal_data.get('contact_person', 'N/A'),
                     'contactEmail': proposal_data.get('contact_email', 'N/A'),

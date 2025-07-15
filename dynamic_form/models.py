@@ -152,6 +152,7 @@ class FormSubmission(models.Model):
     org_type          = models.CharField(max_length=255,blank=True, null=True)
     description       = models.CharField(max_length=1000,blank=True, null=True)
     
+    
 
     # # ———2. Collaborator Details ————————
     # collaborator_name  = models.CharField(max_length=200,blank=True, null=True)
@@ -214,6 +215,7 @@ class FormSubmission(models.Model):
     fund_amount = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
 
     # ---9. Summary Section ---
+    funds_requested= models.PositiveIntegerField(null=True,blank=True) 
     grant_from_ttdf = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
     contribution_applicant = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
     expected_other_contribution = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)

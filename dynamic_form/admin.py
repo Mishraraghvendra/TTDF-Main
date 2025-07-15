@@ -51,7 +51,7 @@ class SubShareHolderInline(admin.TabularInline):
 @admin.register(FormSubmission)
 class FormSubmissionAdmin(admin.ModelAdmin):
     list_display = (
-        'id', 'proposal_id', 'template', 'service', 'applicant', 'status', 'created_at'
+        'id', 'proposal_id','funds_requested', 'template', 'service', 'applicant', 'status', 'created_at'
     )
     readonly_fields = ['form_id', 'proposal_id', 'created_at', 'updated_at']
     search_fields = ['form_id', 'proposal_id', 'subject', 'description']
@@ -89,7 +89,7 @@ class FormSubmissionAdmin(admin.ModelAdmin):
         }),
         ("Finance Summary", {
             'fields': (
-                'grant_from_ttdf', 'contribution_applicant', 'expected_other_contribution',
+                'grant_from_ttdf','funds_requested','contribution_applicant', 'expected_other_contribution',
                 'other_source_funding', 'total_project_cost',
             )
         }),

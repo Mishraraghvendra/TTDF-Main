@@ -208,7 +208,17 @@ class AdministrativeScreeningSerializer(serializers.ModelSerializer):
         return obj.contact_email or ''
 
     def get_fundsRequested(self, obj):
-        return getattr(obj, 'funds_requested', None)
+        m = getattr(obj, '_latest_milestone', None)
+        if m and m.funds_requested is not None:
+            return m.funds_requested
+        milestones = getattr(obj, 'milestones', None)
+        if milestones is not None:
+            ms_iter = milestones.all().order_by('-created_at') if hasattr(milestones, 'all') else milestones
+            for ms in ms_iter:
+                if ms.funds_requested is not None:
+                    return ms.funds_requested
+        return None
+
 
     def get_fundsGranted(self, obj):
         m = getattr(obj, '_latest_milestone', None)
@@ -329,7 +339,11 @@ class TechnicalScreeningDashboardSerializer(serializers.ModelSerializer):
         return obj.contact_email or ''
 
     def get_fundsRequested(self, obj):
-        return getattr(obj, 'funds_requested', None)
+        milestones = obj.milestones.order_by('-created_at')
+        for m in milestones:
+            if m.funds_requested not in (None, 0):
+                return m.funds_requested
+        return None
 
     def get_fundsGranted(self, obj):
         latest = obj.milestones.order_by('-created_at').first()
@@ -459,7 +473,13 @@ class AdminScreeningSerializer(serializers.ModelSerializer):
         return obj.contact_email or ''
 
     def get_fundsRequested(self, obj):
-        return getattr(obj, 'funds_requested', None)
+        milestones = getattr(obj, 'milestones', None)
+        if milestones is not None:
+            ms_iter = milestones.all().order_by('-created_at') if hasattr(milestones, 'all') else milestones[::-1]
+            for m in ms_iter:
+                if getattr(m, 'funds_requested', None):
+                    return m.funds_requested
+        return None
 
     def get_fundsGranted(self, obj):
         m = self._get_latest_milestone(obj)
@@ -605,11 +625,17 @@ class AdminTechnicalScreeningSerializer(serializers.ModelSerializer):
 
     def get_fundsRequested(self, obj):
         fs = obj.screening_record.proposal
-        m = fs.milestones.order_by('-created_at').first()
-        return m.funds_requested if m else None
+        milestones = fs.milestones.order_by('-created_at')
+        for m in milestones:
+            if m.funds_requested not in (None, 0):
+                return m.funds_requested
+        return None  # Or return 0 if you want a default fallback
 
-    def get_fundsRequested(self, obj):
-        return getattr(obj, 'funds_requested', None)
+
+    def get_fundsGranted(self, obj):
+        fs = obj.screening_record.proposal
+        m = fs.milestones.order_by('-created_at').first()
+        return m.grant_from_ttdf if m else None
 
     def get_shortlist(self, obj):
         rec = obj.screening_record
