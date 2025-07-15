@@ -15,7 +15,7 @@ from .views import (
     PasswordResetConfirmView,
     AssignRoleView, AssignPermissionView,ChangeUserRoleView,EvaluatorUserListAPIView,
     InitialSignupView,GetProfileView,UpdateProfileView,ProfileStatusView,
-    SubmissionDetailView,AllSubmissionsView
+    SubmissionDetailView,AllSubmissionsView,ChangePasswordView,AdminChangeUserPasswordView
 )
 
 router = DefaultRouter()
@@ -31,6 +31,8 @@ urlpatterns = [
     path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('token/verify/', TokenVerifyView.as_view(), name='token_verify'),
+    path('change-password/', ChangePasswordView.as_view(), name='change-password'),
+    path('admin-change-password/', AdminChangeUserPasswordView.as_view(), name='admin-change-user-password'),
     path('profile/', ProfileView.as_view(), name='profile'),
     path('password-reset/', PasswordResetRequestView.as_view(), name='password-reset'),
     path('password-reset-confirm/', PasswordResetConfirmView.as_view(), name='password-reset-confirm'),

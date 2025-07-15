@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model, login as django_login
 from django.core.mail import send_mail
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
-from rest_framework import generics, status, viewsets
+from rest_framework import generics, status, viewsets ,permissions
 from rest_framework.permissions import AllowAny, IsAuthenticated, DjangoModelPermissions
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -24,7 +24,7 @@ from .serializers import (
     PasswordResetConfirmSerializer, UserSerializer,
     ChangeUserRoleSerializer, AdminBulkUserCreateSerializer,
     EvaluatorUserSerializer,ProfileGetSerializer,
-    InitialSignupSerializer,ProfileUpdateSerializer
+    InitialSignupSerializer,ProfileUpdateSerializer,ChangePasswordSerializer,AdminChangeUserPasswordSerializer
 )
 from .models import Role, SubAuthUser, Profile, UserRole
 from configuration.models import CommitteeMember, ScreeningCommittee
@@ -109,6 +109,38 @@ from rest_framework.exceptions import ValidationError as DRFValidationError
 from django.core.exceptions import ValidationError as DjangoValidationError
 from .serializers import ApplicantRegistrationSerializer
 from .models import Role, UserRole  # Update import as per your project
+from rest_framework.exceptions import AuthenticationFailed, ValidationError as DRFValidationError
+
+
+
+
+
+def flatten_errors(detail):
+    # For single key like "non_field_errors", just show its value
+    if isinstance(detail, dict):
+        if list(detail.keys()) == ["non_field_errors"]:
+            errors = detail["non_field_errors"]
+            # Customization:
+            if isinstance(errors, list) and any("Invalid credentials" in str(e) for e in errors):
+                return "Invalid email or password."  # <--- Your custom message here
+            elif isinstance(errors, list):
+                return " ".join(str(e) for e in errors)
+            return str(errors)
+        # Otherwise, flatten all fields/messages
+        messages = []
+        for field, errors in detail.items():
+            if isinstance(errors, list):
+                for error in errors:
+                    messages.append(f"{field}: {error}")
+            else:
+                messages.append(f"{field}: {errors}")
+        return " | ".join(messages)
+    elif isinstance(detail, list):
+        return " | ".join([str(e) for e in detail])
+    return str(detail)
+
+
+
 
 class RegisterApplicantView(generics.CreateAPIView):
     serializer_class = ApplicantRegistrationSerializer
@@ -272,20 +304,22 @@ class LoginView(APIView):
         except AuthenticationFailed as exc:
             return Response({
                 "status":           "error",
-                "response_message": exc.detail
+                "response_message": flatten_errors(exc.detail)
             }, status=status.HTTP_401_UNAUTHORIZED)
 
         except DRFValidationError as exc:
             return Response({
                 "status":           "error",
-                "response_message": exc.detail
+                "response_message": flatten_errors(exc.detail)
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        except Exception:
+        except Exception as exc:
+            logger.error(f"Unexpected error in LoginView: {exc}")
             return Response({
                 "status":           "error",
                 "response_message": "Login failed due to an internal error."
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
     def get_profile_status(self, user):
         """Check if user profile is complete based on required fields"""
@@ -350,6 +384,70 @@ class LoginView(APIView):
         except Exception as e:
             logger.error(f"Error checking profile status: {str(e)}")
             return "incomplete"
+
+
+
+from rest_framework.permissions import IsAdminUser  # Or your custom admin check
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+class AdminChangeUserPasswordView(APIView):
+    permission_classes = [IsAdminUser]  # Restrict to admins
+
+    def post(self, request):
+        serializer = AdminChangeUserPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data['email']
+        new_password = serializer.validated_data['new_password']
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response({
+                "status": "error",
+                "response_message": "User with this email does not exist."
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        user.set_password(new_password)
+        user.save()
+
+        return Response({
+            "status": "success",
+            "response_message": f"Password for {user.email} changed successfully."
+        }, status=status.HTTP_200_OK)
+
+
+
+    
+class ChangePasswordView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = request.user
+        old_password = serializer.validated_data['old_password']
+        new_password = serializer.validated_data['new_password']
+
+        # Check old password
+        if not user.check_password(old_password):
+            return Response(
+                {"old_password": "Wrong password."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Set new password
+        user.set_password(new_password)
+        user.save()
+
+        return Response({"detail": "Password changed successfully."}, status=status.HTTP_200_OK)
+
+
 
 
 class ProfileView(generics.RetrieveUpdateAPIView):

@@ -754,7 +754,7 @@ class IPRDetails(models.Model):
     business_strategy = models.TextField(blank=True, null=True)
 
     # IP Regulatory Details
-    based_on_ipr = models.TextField(blank=True, null=True)
+    based_on_ipr = models.CharField(max_length=3, choices=YES_NO_CHOICES, blank=True, null=True)
     ip_ownership_details = models.TextField(blank=True, null=True)
     ip_proposal = models.TextField(blank=True, null=True)
     regulatory_approvals = models.TextField(blank=True, null=True)
@@ -809,7 +809,7 @@ COLLABORATOR_CHOICES=[
 
 class Collaborator(models.Model):
     form_submission = models.ForeignKey(FormSubmission, related_name="collaborators", on_delete=models.CASCADE)
-    collaborator_type = models.CharField(max_length=50, choices=COLLABORATOR_CHOICES,blank=True, null=True)
+    applicantType = models.CharField(max_length=50, choices=COLLABORATOR_CHOICES,blank=True, null=True)
     contact_person_name_collab = models.CharField(max_length=200, blank=True, null=True)
     organization_name_collab = models.CharField(max_length=200, blank=True, null=True)
     organization_type_collab = models.CharField(max_length=50, blank=True, null=True)
@@ -852,16 +852,12 @@ class SubShareHolder(models.Model):
     identity_document_name = models.CharField(max_length=255, blank=True, null=True)
     organization_name_subholder = models.CharField(max_length=200, blank=True, null=True)
 
-
 class TeamMember(models.Model):
     form_submission = models.ForeignKey(FormSubmission, related_name="team_members", on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
     resumefile = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="Team Resumes/"), blank=True, null=True)
     resumetext = models.TextField(blank=True, null=True)
     otherdetails = models.TextField(blank=True, null=True)
-
-
-
 
 
 class FormPage(models.Model):

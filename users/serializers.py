@@ -52,6 +52,21 @@ class LoginSerializer(serializers.Serializer):
         return data
 
 
+# Change Password
+class ChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField(required=True)
+    new_password = serializers.CharField(required=True, min_length=8)
+
+
+
+
+class AdminChangeUserPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+    new_password = serializers.CharField(required=True, min_length=8)
+
+
+
+
 # Profile
 class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
@@ -351,6 +366,7 @@ class UserSerializer(serializers.ModelSerializer):
         instance.save()
         return instance
 
+
 class ChangeUserRoleSerializer(serializers.Serializer):
     email = serializers.EmailField()
     roles = serializers.ListField(child=serializers.CharField())
@@ -453,7 +469,6 @@ class EvaluatorUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'name', 'email', 'mobile', 'organization','profile']
-
 
 
 class InitialSignupSerializer(serializers.ModelSerializer):

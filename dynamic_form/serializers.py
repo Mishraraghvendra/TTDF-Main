@@ -9,28 +9,6 @@ import json
 import re
  
 
-class IPRDetailsSerializer(serializers.ModelSerializer):
-    proof_of_status = serializers.FileField(required=False, allow_null=True)
-    proof_of_status_url = serializers.SerializerMethodField()
-    t_support_letter = serializers.FileField(required=False, allow_null=True)
-    t_support_letter_url = serializers.SerializerMethodField()
-    
-    class Meta:
-        model = IPRDetails
-        fields = [
-            # all your fields here, e.g.
-            'id', 'submission', 'name', 'national_importance', # ...all model fields
-            'proof_of_status', 't_support_letter',
-            'proof_of_status_url', 't_support_letter_url',
-]
-
-    
-    def get_proof_of_status_url(self, obj):
-        return obj.proof_of_status.url if obj.proof_of_status else None
-
-    def get_t_support_letter_url(self, obj):
-        return obj.t_support_letter.url if obj.t_support_letter else None
-
 
 
 class FundLoanDocumentSerializer(serializers.ModelSerializer):
@@ -139,6 +117,23 @@ class TeamMemberSerializer(serializers.ModelSerializer):
     class Meta:
         model = TeamMember
         fields = ['id', 'name', 'resumefile', 'resumetext', 'otherdetails']
+
+class IPRDetailsSerializer(serializers.ModelSerializer):
+    proof_of_status = serializers.FileField(required=False, allow_null=True)
+    proof_of_status_url = serializers.SerializerMethodField()
+    t_support_letter = serializers.FileField(required=False, allow_null=True)
+    t_support_letter_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = IPRDetails
+        fields = '__all__'  # This includes every model field plus the two url fields below
+
+    def get_proof_of_status_url(self, obj):
+        return obj.proof_of_status.url if obj.proof_of_status else None
+
+    def get_t_support_letter_url(self, obj):
+        return obj.t_support_letter.url if obj.t_support_letter else None
+
 
 
 class FormSubmissionSerializer(serializers.ModelSerializer):
@@ -481,14 +476,37 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
         return FullProfileSerializer(profile).data
 
    
+    # def _inject_file_objects(self, records, file_field_names):
+    #     """Inject file objects from request.FILES into record dictionaries"""
+    #     files = self.context['request'].FILES
+    #     for rec in records:
+    #         for field in file_field_names:
+    #             val = rec.get(field)
+    #             if isinstance(val, str) and val in files:
+    #                 rec[field] = files[val]
+
     def _inject_file_objects(self, records, file_field_names):
-        """Inject file objects from request.FILES into record dictionaries"""
+        """
+        Replace string references in file_field_names with actual file objects from request.FILES.
+        If the value is not found in FILES or is an invalid type (e.g., dict), set to None.
+        """
         files = self.context['request'].FILES
         for rec in records:
             for field in file_field_names:
                 val = rec.get(field)
                 if isinstance(val, str) and val in files:
                     rec[field] = files[val]
+                elif isinstance(val, dict):
+                    # Prevent saving dicts in FileField
+                    rec[field] = None
+                elif val is None or val == "":
+                    # Optionally ensure empty value is None
+                    rec[field] = None
+
+
+
+
+
 
     def create(self, validated_data):
         request = self.context['request']
