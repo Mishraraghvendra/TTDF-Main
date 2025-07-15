@@ -130,6 +130,12 @@ class FormSubmission(models.Model):
         on_delete=models.SET_NULL,
         related_name='form_submissions'
     )
+    completed_sections = models.JSONField(
+        blank=True,
+        null=True,
+        default=list,
+        help_text="List of completed section indices"
+    )
     status       = models.CharField(max_length=20, choices=STATUS_CHOICES, default=DRAFT)
     form_id      = models.CharField(max_length=50, unique=True, editable=False)
     proposal_id  = models.CharField(max_length=50, unique=True, null=True, blank=True, editable=False)
@@ -151,7 +157,6 @@ class FormSubmission(models.Model):
     subject           = models.CharField(max_length=1000,blank=True, null=True)
     org_type          = models.CharField(max_length=255,blank=True, null=True)
     description       = models.CharField(max_length=1000,blank=True, null=True)
-    
     
 
     # # ———2. Collaborator Details ————————
@@ -213,9 +218,10 @@ class FormSubmission(models.Model):
     fund_source_details = models.CharField(max_length=255, blank=True, null=True)
     fund_item = models.CharField(max_length=255, blank=True, null=True)
     fund_amount = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
+    contribution_rows = models.JSONField(blank=True, null=True, default=list, help_text="Array of contribution entries")
+    fund_rows = models.JSONField(blank=True, null=True, default=list, help_text="Array of fund entries")
 
     # ---9. Summary Section ---
-    funds_requested= models.PositiveIntegerField(null=True,blank=True) 
     grant_from_ttdf = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
     contribution_applicant = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
     expected_other_contribution = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
@@ -273,19 +279,22 @@ class FormSubmission(models.Model):
     gantt_chart = models.FileField(
         upload_to=partial(upload_to_dynamic, subfolder="gantt_charts"),
         blank=True,
-        null=True
-    )
+        null=True,
+        max_length=500
+        )
 
     technical_proposal = models.FileField(
         upload_to=partial(upload_to_dynamic, subfolder="technical_proposals"),
         blank=True,
-        null=True
+        null=True,
+        max_length=500
     )
 
     proposal_presentation = models.FileField(
         upload_to=partial(upload_to_dynamic, subfolder="proposal_presentations"),
         blank=True,
-        null=True
+        null=True,
+        max_length=500
     )
 
     # --- Manpower Details Section ---
@@ -702,7 +711,7 @@ class FormSubmission(models.Model):
         relateds = [
             (self.fund_loan_documents.all(), ['document']),
             (self.iprdetails.all(), ['t_support_letter']),
-            (self.collaborators.all(), ['pan_file_collb', 'mou_file_collab']),
+            (self.collaborators.all(), ['pan_file_collab', 'mou_file_collab']),
             (self.rdstaff.all(), ['rd_staf_resume']),
             (self.shareholders.all(), ['identity_document']),
             (self.sub_shareholders.all(), ['identity_document']),
@@ -756,13 +765,13 @@ class IPRDetails(models.Model):
     business_strategy = models.TextField(blank=True, null=True)
 
     # IP Regulatory Details
-    based_on_ipr = models.CharField(max_length=3, choices=YES_NO_CHOICES, blank=True, null=True)
+    based_on_ipr = models.TextField(blank=True, null=True)
     ip_ownership_details = models.TextField(blank=True, null=True)
     ip_proposal = models.TextField(blank=True, null=True)
     regulatory_approvals = models.TextField(blank=True, null=True)
     status_approvals = models.TextField(blank=True, null=True)
     proof_of_status = models.FileField(
-        upload_to=partial(upload_to_dynamic, subfolder="Proof of Status"),
+        upload_to=partial(upload_to_dynamic, subfolder="ipr_proof"),
         blank=True,
         null=True
     )
@@ -796,8 +805,8 @@ class FundLoanDocument(models.Model):
         return self.document.name if self.document else "No file"
 
 TTDF_COMPANY_CHOICES = [
-    ('domestic_company', 'Domestic Company(ies) with focus on telecom R&D, Use case development'),
-    ('startup_msme', 'Startups / MSMEs'),
+    ('domestic_company', 'Domestic companies with focus on telecom R&D, Use case development'),
+    ('startup_msme', 'Start-ups/MSMEs'),
     ('academic', 'Academic institutions'),
     ('rnd_section8_govt', 'R&D institutions, Section 8 companies / Societies, Central & State government entities / PSUs /Autonomous Bodies/SPVs / Limited liability partnerships'),
 ]
@@ -805,18 +814,18 @@ TTDF_COMPANY_CHOICES = [
 COLLABORATOR_CHOICES=[
 
 ('principalApplicant','principalApplicant'),
-('consortiumPartner','principalApplicant'),
+('consortiumPartner','consortiumPartner'),
 
 ]
 
 class Collaborator(models.Model):
     form_submission = models.ForeignKey(FormSubmission, related_name="collaborators", on_delete=models.CASCADE)
-    applicantType = models.CharField(max_length=50, choices=COLLABORATOR_CHOICES,blank=True, null=True)
+    collaborator_type = models.CharField(max_length=50, choices=COLLABORATOR_CHOICES,blank=True, null=True)
     contact_person_name_collab = models.CharField(max_length=200, blank=True, null=True)
     organization_name_collab = models.CharField(max_length=200, blank=True, null=True)
     organization_type_collab = models.CharField(max_length=50, blank=True, null=True)
-    ttdf_company = models.CharField(max_length=1000,choices=TTDF_COMPANY_CHOICES,blank=True,null=True)
-    pan_file_collb = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="collaborator/pan"), blank=True, null=True)
+    ttdf_company = models.CharField(max_length=1000,blank=True,null=True)
+    pan_file_collab = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="collaborator/pan"), blank=True, null=True)
     pan_file_name_collab = models.CharField(max_length=255, blank=True, null=True)
     mou_file_collab = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="collaborator/mou"), blank=True, null=True)
     mou_file_name_collab = models.CharField(max_length=255, blank=True, null=True)
@@ -854,12 +863,16 @@ class SubShareHolder(models.Model):
     identity_document_name = models.CharField(max_length=255, blank=True, null=True)
     organization_name_subholder = models.CharField(max_length=200, blank=True, null=True)
 
+
 class TeamMember(models.Model):
     form_submission = models.ForeignKey(FormSubmission, related_name="team_members", on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
     resumefile = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="Team Resumes/"), blank=True, null=True)
     resumetext = models.TextField(blank=True, null=True)
     otherdetails = models.TextField(blank=True, null=True)
+
+
+
 
 
 class FormPage(models.Model):
@@ -947,4 +960,7 @@ class ApplicationStatusHistory(models.Model):
 
     class Meta:
         ordering = ['-change_date']
+
+
+   
 

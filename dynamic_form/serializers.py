@@ -9,6 +9,11 @@ import json
 import re
  
 
+class IPRDetailsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = IPRDetails
+        fields = "__all__"
+        read_only_fields = ("id", "created_at", "submission")
 
 
 class FundLoanDocumentSerializer(serializers.ModelSerializer):
@@ -118,23 +123,6 @@ class TeamMemberSerializer(serializers.ModelSerializer):
         model = TeamMember
         fields = ['id', 'name', 'resumefile', 'resumetext', 'otherdetails']
 
-class IPRDetailsSerializer(serializers.ModelSerializer):
-    proof_of_status = serializers.FileField(required=False, allow_null=True)
-    proof_of_status_url = serializers.SerializerMethodField()
-    t_support_letter = serializers.FileField(required=False, allow_null=True)
-    t_support_letter_url = serializers.SerializerMethodField()
-
-    class Meta:
-        model = IPRDetails
-        fields = '__all__'  # This includes every model field plus the two url fields below
-
-    def get_proof_of_status_url(self, obj):
-        return obj.proof_of_status.url if obj.proof_of_status else None
-
-    def get_t_support_letter_url(self, obj):
-        return obj.t_support_letter.url if obj.t_support_letter else None
-
-
 
 class FormSubmissionSerializer(serializers.ModelSerializer):
     
@@ -155,12 +143,14 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at',
             'service_name', 'last_updated', 'create_date'
         ]
+
+ 
     
 
     def to_internal_value(self, data):
         import json, re
         json_fields = [
-            'fund_loan_documents', 'teamMembers','iprdetails', 'collaborators', 'equipments','budget_estimate',
+            'fund_loan_documents', 'teamMembers','iprdetails', 'collaborators', 'equipments',
             'shareholders', 'rdstaff', 'sub_shareholders', 'milestones'
         ]
         # print("=== PROCESSING REQUEST DATA ===")
@@ -204,12 +194,8 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
                         field_data = [{'identity_document': file} for file in array_values if file]
                     elif field == 'collaborators':
                         field_data = [{'pan_file_collb': file} for file in array_values if file]
-                    # elif field == 'iprdetails':
-                    #     field_data = [{'t_support_letter': file} for file in array_values if file]
-
-                    elif field == 'iprdetails':                        
-                        for file in array_values:                        
-                            field_data.append({'t_support_letter': file, 'proof_of_status': file})
+                    elif field == 'iprdetails':
+                        field_data = [{'t_support_letter': file} for file in array_values if file]
                     else:
                         field_data = [{'file_field': file} for file in array_values if file]
                     print(f"✅ {field}: Found {len(field_data)} files as array")
@@ -406,7 +392,6 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
         """Add nested data AND flatten profile fields to the response"""
         data = super().to_representation(instance)
         
-        
         # Add nested serialized data to response
         data['fund_loan_documents'] = FundLoanDocumentSerializer(instance.fund_loan_documents.all(), many=True).data
         data['iprdetails'] = IPRDetailsSerializer(instance.iprdetails.all(), many=True).data
@@ -475,38 +460,99 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
             return None
         return FullProfileSerializer(profile).data
 
-   
-    # def _inject_file_objects(self, records, file_field_names):
-    #     """Inject file objects from request.FILES into record dictionaries"""
-    #     files = self.context['request'].FILES
-    #     for rec in records:
-    #         for field in file_field_names:
-    #             val = rec.get(field)
-    #             if isinstance(val, str) and val in files:
-    #                 rec[field] = files[val]
+    # def validate(self, data):
+    #     from dynamic_form.models import Collaborator  # adjust import if needed
+
+    #     collaborators = data.get('collaborators', [])
+    #     proposed_village = data.get('proposed_village') or (self.instance and self.instance.proposed_village)
+    #     orgs_seen = set()
+    #     pans_seen = set()
+
+    #     # === Print ALL collaborators in DB for debugging ===
+    #     print("\n=== ALL Collaborators in DB BEFORE VALIDATION ===")
+    #     all_collabs = Collaborator.objects.all().order_by("id")
+    #     for c in all_collabs:
+    #         print(f"ID: {c.id} | Org: '{c.organization_name_collab}' | PAN: '{c.pan_file_name_collab}' | Village: '{getattr(c.form_submission, 'proposed_village', None)}' | Submission: {getattr(c.form_submission, 'id', None)}")
+    #     print("=== END ALL COLLABORATORS IN DB ===")
+
+    #     print("\n==== Collaborator Uniqueness Check START ====")
+    #     print(f"Proposed village: {proposed_village}")
+    #     print(f"Collaborators in submission: {len(collaborators)}")
+
+    #     # 1. Check for duplicates *within this request*
+    #     for collab in collaborators:
+    #         org = (collab.get('organization_name_collab') or '').strip().lower()
+    #         pan = (collab.get('pan_file_name_collab') or '').strip().upper()
+    #         print(f"  Collaborator: org='{org}' pan='{pan}'")
+    #         if org and org in orgs_seen:
+    #             print(f"❌ Duplicate org in this submission: {org}")
+    #             raise serializers.ValidationError(f"Duplicate organization '{org}' in collaborators for this submission.")
+    #         if pan and pan in pans_seen:
+    #             print(f"❌ Duplicate PAN in this submission: {pan}")
+    #             raise serializers.ValidationError(f"Duplicate PAN '{pan}' in collaborators for this submission.")
+    #         orgs_seen.add(org)
+    #         pans_seen.add(pan)
+
+    #     # 2. Check against DB (print all found)
+    #     for org in orgs_seen:
+    #         db_qs = Collaborator.objects.filter(
+    #             organization_name_collab__iexact=org,
+    #             form_submission__proposed_village=proposed_village,
+    #         )
+    #         if self.instance:
+    #             db_qs = db_qs.exclude(form_submission=self.instance)
+    #         db_count = db_qs.count()
+    #         print(f"DB check for org '{org}' in village '{proposed_village}': found {db_count} records.")
+    #         if db_count > 0:
+    #             for c in db_qs:
+    #                 print(f"  -> DB match org: {c.organization_name_collab} | PAN: {c.pan_file_name_collab} | Submission: {getattr(c.form_submission, 'id', None)}")
+    #             raise serializers.ValidationError(
+    #                 f"Collaborator with organization '{org}' already exists for village '{proposed_village}'."
+    #             )
+
+    #     for pan in pans_seen:
+    #         if not pan:
+    #             continue
+    #         db_qs = Collaborator.objects.filter(
+    #             pan_file_name_collab__iexact=pan,
+    #             form_submission__proposed_village=proposed_village,
+    #         )
+    #         if self.instance:
+    #             db_qs = db_qs.exclude(form_submission=self.instance)
+    #         db_count = db_qs.count()
+    #         print(f"DB check for PAN '{pan}' in village '{proposed_village}': found {db_count} records.")
+    #         if db_count > 0:
+    #             for c in db_qs:
+    #                 print(f"  -> DB match org: {c.organization_name_collab} | PAN: {c.pan_file_name_collab} | Submission: {getattr(c.form_submission, 'id', None)}")
+    #             raise serializers.ValidationError(
+    #                 f"Collaborator with PAN '{pan}' already exists for village '{proposed_village}'."
+    #             )
+
+    #     print("==== Collaborator Uniqueness Check PASSED ====\n")
+
+    #     # --- Template/business rule checks
+    #     tpl = data.get('template') or (self.instance.template if self.instance else None)
+    #     if tpl:
+    #         now = timezone.now()
+    #         if not tpl.is_active:
+    #             raise serializers.ValidationError("Form not active.")
+    #         if tpl.start_date and now < tpl.start_date:
+    #             raise serializers.ValidationError("Not open yet.")
+    #         if tpl.end_date and now > tpl.end_date:
+    #             raise serializers.ValidationError("Deadline passed.")
+    #         if self.instance and not self.instance.can_edit():
+    #             raise serializers.ValidationError("Cannot edit after deadline/final submit.")
+
+    #     return data
 
     def _inject_file_objects(self, records, file_field_names):
-        """
-        Replace string references in file_field_names with actual file objects from request.FILES.
-        If the value is not found in FILES or is an invalid type (e.g., dict), set to None.
-        """
+        """Inject file objects from request.FILES into record dictionaries"""
         files = self.context['request'].FILES
         for rec in records:
             for field in file_field_names:
                 val = rec.get(field)
                 if isinstance(val, str) and val in files:
                     rec[field] = files[val]
-                elif isinstance(val, dict):
-                    # Prevent saving dicts in FileField
-                    rec[field] = None
-                elif val is None or val == "":
-                    # Optionally ensure empty value is None
-                    rec[field] = None
-
-
-
-
-
 
     def create(self, validated_data):
         request = self.context['request']
@@ -551,7 +597,7 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
 
         # Inject file objects for indexed uploads (files referenced by name)
         self._inject_file_objects(fund_loan_documents, ['document'])
-        self._inject_file_objects(iprdetails, ['t_support_letter', 'proof_of_status'])
+        self._inject_file_objects(iprdetails, ['t_support_letter'])
         self._inject_file_objects(collaborators, ['pan_file_collb', 'mou_file_collab'])
         self._inject_file_objects(equipments, [])
         self._inject_file_objects(shareholders, ['identity_document'])
@@ -691,7 +737,7 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
         if iprdetails is not None:
             print(f"Updating iprdetails: {len(iprdetails)} items")
             instance.iprdetails.all().delete()
-            self._inject_file_objects(iprdetails, ['t_support_letter', 'proof_of_status'])
+            self._inject_file_objects(iprdetails, ['t_support_letter'])
             for ipr in iprdetails:
                 try:
                     IPRDetails.objects.create(submission=instance, **ipr)
@@ -771,7 +817,7 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
 
         print("=== FINISHED UPDATING OBJECTS ===")
 
-
+        
         team_members = nested_data.get('teamMembers', [])
         self._inject_file_objects(team_members, ['resumefile'])
         instance.team_members.all().delete()
