@@ -534,13 +534,13 @@ class BudgetEstimateSerializer(serializers.ModelSerializer):
         if instance.budget_estimate and 'tables' in instance.budget_estimate:
             data['tables'] = instance.budget_estimate['tables']
         
-        return data
+        return data 
 
 class FinanceDetailsSerializer(serializers.ModelSerializer):
     class Meta:
         model = FormSubmission
         fields = [
-            'id', 'form_id', 'proposal_id', 'status',
+            'id', 'form_id', 'proposal_id', 'status','funds_requested','actual_contribution_applicant',
             'contribution_expected_source', 'contribution_item', 'contribution_amount',
             'fund_source_details', 'fund_item', 'fund_amount',
             'grant_from_ttdf', 'contribution_applicant', 'expected_other_contribution',
@@ -557,7 +557,7 @@ class FinanceDetailsSerializer(serializers.ModelSerializer):
  
         finance_fields = [
             'contribution_expected_source', 'contribution_item', 'contribution_amount',
-            'fund_source_details', 'fund_item', 'fund_amount',
+            'fund_source_details', 'fund_item', 'fund_amount','funds_requested','actual_contribution_applicant',
             'grant_from_ttdf', 'contribution_applicant', 'expected_other_contribution',
             'other_source_funding', 'total_project_cost', 'contribution_percentage'
         ]

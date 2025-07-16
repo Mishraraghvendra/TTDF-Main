@@ -42,30 +42,46 @@ class FormTemplate(models.Model):
         return self.title
 
 
+
 # def upload_to_dynamic(instance, filename, subfolder=None):
-#     # Handles both direct file fields and related models if needed
 #     service = getattr(instance, 'service', None)
 #     if not service and hasattr(instance, 'form_submission'):
 #         service = getattr(instance.form_submission, 'service', None)
 #     service_name = getattr(service, 'name', 'unknown') if service else "unknown"
 #     service_name = service_name.replace(" ", "_").lower()
 #     folder = subfolder or "docs"
-#     return f"{folder}/{service_name}/{filename}"
+#     # Get proposal_id
+#     proposal_id = getattr(instance, 'proposal_id', None)
+#     if not proposal_id and hasattr(instance, 'form_submission'):
+#         proposal_id = getattr(instance.form_submission, 'proposal_id', None)
+#     if not proposal_id:
+#         proposal_id = "draft"
+#     return f"services/{service_name}/{proposal_id}/{folder}/{filename}"
+
 
 def upload_to_dynamic(instance, filename, subfolder=None):
-    service = getattr(instance, 'service', None)
-    if not service and hasattr(instance, 'form_submission'):
-        service = getattr(instance.form_submission, 'service', None)
-    service_name = getattr(service, 'name', 'unknown') if service else "unknown"
-    service_name = service_name.replace(" ", "_").lower()
+    # Get form template name
+    form_template = None
+    if hasattr(instance, 'form_template'):
+        form_template = instance.form_template
+    elif hasattr(instance, 'form_submission') and hasattr(instance.form_submission, 'form_template'):
+        form_template = instance.form_submission.form_template
+
+    template_name = getattr(form_template, 'name', 'unknown') if form_template else "unknown"
+    template_name = template_name.replace(" ", "_").lower()
+
     folder = subfolder or "docs"
+
     # Get proposal_id
     proposal_id = getattr(instance, 'proposal_id', None)
     if not proposal_id and hasattr(instance, 'form_submission'):
         proposal_id = getattr(instance.form_submission, 'proposal_id', None)
     if not proposal_id:
         proposal_id = "draft"
-    return f"services/{service_name}/{proposal_id}/{folder}/{filename}"
+
+    return f"templates/{template_name}/{proposal_id}/{folder}/{filename}"
+
+
 
 
 
@@ -141,7 +157,7 @@ class FormSubmission(models.Model):
     proposal_id  = models.CharField(max_length=50, unique=True, null=True, blank=True, editable=False)
     contact_name = models.CharField(max_length=200, blank=True)
     contact_email= models.EmailField(blank=True)
-    applicationDocument = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="pdf"), blank=True, null=True)
+    applicationDocument = models.FileField(max_length=512,upload_to=partial(upload_to_dynamic, subfolder="pdf"), blank=True, null=True)
     is_active    = models.BooleanField(default=True)
     created_at   = models.DateTimeField(auto_now_add=True)
     updated_at   = models.DateTimeField(auto_now=True)
@@ -150,10 +166,10 @@ class FormSubmission(models.Model):
 
     # ——— 1. Basic Information ——————————————————
     individual_pan    = models.CharField(max_length=20,blank=True, null=True)
-    pan_file          = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="pan"),blank=True, null=True)
+    pan_file          = models.FileField(max_length=512,upload_to=partial(upload_to_dynamic, subfolder="pan"),blank=True, null=True)
     applicant_type    = models.CharField(max_length=20, choices=APPLICANT_TYPE_CHOICES,blank=True, null=True)
-    passport_file     = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="passport"),blank=True, null=True)
-    resume_upload     = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="resume"),blank=True, null=True)
+    passport_file     = models.FileField(max_length=512,upload_to=partial(upload_to_dynamic, subfolder="passport"),blank=True, null=True)
+    resume_upload     = models.FileField(max_length=512,upload_to=partial(upload_to_dynamic, subfolder="resume"),blank=True, null=True)
     subject           = models.CharField(max_length=1000,blank=True, null=True)
     org_type          = models.CharField(max_length=255,blank=True, null=True)
     description       = models.CharField(max_length=1000,blank=True, null=True)
@@ -228,6 +244,8 @@ class FormSubmission(models.Model):
     expected_other_contribution = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
     other_source_funding = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
     total_project_cost = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
+    actual_contribution_applicant = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
+ 
 
 
     # ---10 Key Information Section ---
@@ -328,7 +346,7 @@ class FormSubmission(models.Model):
         default=dict,
         help_text="Nested budget: {'tables':[{'id':'','title':'','serviceOfferings':[{'id':'','name':'','items':[{'id':'','description':'','financials':{'capex':{'year0':{...}},'opex':{'year1':{...}}}}]}]}]}"
     )
-    budget_estimate_sample_doc = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="Sample Document"),blank=True, null=True)
+    budget_estimate_sample_doc = models.FileField(max_length=512,upload_to=partial(upload_to_dynamic, subfolder="Sample Document"),blank=True, null=True)
     
 
     equipment_overhead = models.JSONField(
@@ -341,7 +359,7 @@ class FormSubmission(models.Model):
         )
     )
 
-    equipment_overhead_sample_doc = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="Sample Document"),blank=True, null=True)
+    equipment_overhead_sample_doc = models.FileField(max_length=512,upload_to=partial(upload_to_dynamic, subfolder="Sample Document"),blank=True, null=True)
     
 
     # --- Income Estimate Section ---
@@ -355,7 +373,7 @@ class FormSubmission(models.Model):
         )
     )
 
-    income_estimate_sample_doc = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="Sample Document"),blank=True, null=True)
+    income_estimate_sample_doc = models.FileField(max_length=512,upload_to=partial(upload_to_dynamic, subfolder="Sample Document"),blank=True, null=True)
 
 
     # --- Proposal Cost Breakdown Section ---
@@ -446,13 +464,13 @@ class FormSubmission(models.Model):
         null=True
     )
 
-    presentation = models.FileField(
+    presentation = models.FileField(max_length=512,
             upload_to=partial(upload_to_dynamic, subfolder="Presentation"),
             blank=True,
             null=True
         )
     
-    dpr = models.FileField(
+    dpr = models.FileField(max_length=512,
             upload_to=partial(upload_to_dynamic, subfolder="DPR"),
             blank=True,
             null=True
@@ -475,13 +493,13 @@ class FormSubmission(models.Model):
     org_official_email              = models.EmailField(blank=True, null=True)
     org_website                     = models.URLField(blank=True, null=True)
     org_shares_51pct_indian_citizens= models.CharField(max_length=3, choices=YES_NO_CHOICES,blank=True, null=True)
-    org_tan_pan_cin_file            = models.FileField(upload_to='org_docs/',blank=True, null=True)
-    org_registration_certificate    = models.FileField(upload_to='org_docs/',blank=True, null=True)
-    org_approval_certificate        = models.FileField(upload_to='org_docs/',blank=True, null=True)
-    org_registration_certificate_2  = models.FileField(upload_to='org_docs/', blank=True, null=True)
-    org_annual_report               = models.FileField(upload_to='org_docs/', blank=True, null=True)
-    org_industry_auth_letter        = models.FileField(upload_to='org_docs/', blank=True, null=True)
-    org_shareholding_pattern_file   = models.FileField(upload_to='org_docs/', blank=True, null=True)
+    org_tan_pan_cin_file            = models.FileField(max_length=512,upload_to='org_docs/',blank=True, null=True)
+    org_registration_certificate    = models.FileField(max_length=512,upload_to='org_docs/',blank=True, null=True)
+    org_approval_certificate        = models.FileField(max_length=512,upload_to='org_docs/',blank=True, null=True)
+    org_registration_certificate_2  = models.FileField(max_length=512,upload_to='org_docs/', blank=True, null=True)
+    org_annual_report               = models.FileField(max_length=512,upload_to='org_docs/', blank=True, null=True)
+    org_industry_auth_letter        = models.FileField(max_length=512,upload_to='org_docs/', blank=True, null=True)
+    org_shareholding_pattern_file   = models.FileField(max_length=512,upload_to='org_docs/', blank=True, null=True)
 
     # ——— 3. Proposal Summary ——————————————————
     current_trl            = models.PositiveIntegerField(null=True,blank=True,help_text="Can be filled later")
@@ -538,7 +556,7 @@ class FormSubmission(models.Model):
     ipr_ownership_details            = models.TextField(blank=True, null=True)
     ipr_proposal_details             = models.TextField(blank=True, null=True)
     ipr_potential_impact             = models.TextField(blank=True, null=True)
-    ipr_patent_file                  = models.FileField(upload_to='ipr/', blank=True, null=True)
+    ipr_patent_file                  = models.FileField(max_length=512,upload_to='ipr/', blank=True, null=True)
     ipr_registered_no                = models.CharField(max_length=50, blank=True)
     ipr_background_details           = models.TextField(blank=True, null=True)
     ipr_generate_new_ip              = models.CharField(max_length=3, choices=YES_NO_CHOICES,blank=True, null=True)
@@ -550,7 +568,7 @@ class FormSubmission(models.Model):
     ipr_regulatory_info              = models.CharField(max_length=3, choices=YES_NO_CHOICES,blank=True, null=True)
     ipr_incubation                   = models.CharField(max_length=3, choices=YES_NO_CHOICES,blank=True, null=True)
     ipr_approval_details             = models.TextField(blank=True, null=True)
-    ipr_architecture_chart           = models.FileField(upload_to='ipr/', blank=True, null=True)
+    ipr_architecture_chart           = models.FileField(max_length=512,upload_to='ipr/', blank=True, null=True)
 
     # ——— 9. Patents ——————————
     patent_number   = models.CharField(max_length=50, blank=True, null=True)
@@ -586,7 +604,7 @@ class FormSubmission(models.Model):
     grants_from_ttdf           = models.DecimalField(max_digits=12, decimal_places=5, null=True, blank=True)
 
     # ——— 15. Declaration ——————
-    declaration_document       = models.FileField(upload_to='declarations/',blank=True, null=True)
+    declaration_document       = models.FileField(max_length=512,upload_to='declarations/',blank=True, null=True)
     declaration_1              = models.BooleanField(default=False)
     declaration_2              = models.BooleanField(default=False)
     declaration_3              = models.BooleanField(default=False)
@@ -771,7 +789,7 @@ class IPRDetails(models.Model):
     ip_proposal = models.TextField(blank=True, null=True)
     regulatory_approvals = models.TextField(blank=True, null=True)
     status_approvals = models.TextField(blank=True, null=True)
-    proof_of_status = models.FileField(
+    proof_of_status = models.FileField(max_length=512,
         upload_to=partial(upload_to_dynamic, subfolder="ipr_proof"),
         blank=True,
         null=True
@@ -783,7 +801,7 @@ class IPRDetails(models.Model):
     t_mobile_number = models.CharField(max_length=20, blank=True, null=True)
     t_email = models.EmailField(blank=True, null=True)
     t_address = models.TextField(blank=True, null=True)
-    t_support_letter = models.FileField(
+    t_support_letter = models.FileField(max_length=512,
         upload_to=partial(upload_to_dynamic, subfolder="support_letters"),
         blank=True,
         null=True
@@ -797,7 +815,7 @@ class FundLoanDocument(models.Model):
         on_delete=models.CASCADE,
         related_name="fund_loan_documents"
     )
-    document = models.FileField(
+    document = models.FileField(max_length=512,
         upload_to=partial(upload_to_dynamic, subfolder="Loan"),
         blank=True,
         null=True
@@ -826,9 +844,9 @@ class Collaborator(models.Model):
     organization_name_collab = models.CharField(max_length=200, blank=True, null=True)
     organization_type_collab = models.CharField(max_length=50, blank=True, null=True)
     ttdf_company = models.CharField(max_length=1000,blank=True,null=True)
-    pan_file_collab = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="collaborator/pan"), blank=True, null=True)
+    pan_file_collab = models.FileField(max_length=512,upload_to=partial(upload_to_dynamic, subfolder="collaborator/pan"), blank=True, null=True)
     pan_file_name_collab = models.CharField(max_length=255, blank=True, null=True)
-    mou_file_collab = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="collaborator/mou"), blank=True, null=True)
+    mou_file_collab = models.FileField(max_length=512,upload_to=partial(upload_to_dynamic, subfolder="collaborator/mou"), blank=True, null=True)
     mou_file_name_collab = models.CharField(max_length=255, blank=True, null=True)
 
 class Equipment(models.Model):
@@ -843,7 +861,7 @@ class ShareHolder(models.Model):
     form_submission = models.ForeignKey(FormSubmission, related_name="shareholders", on_delete=models.CASCADE)
     share_holder_name = models.CharField(max_length=255, blank=True, null=True)
     share_percentage = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
-    identity_document = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="shareholder/docs"), blank=True, null=True)
+    identity_document = models.FileField(max_length=512,upload_to=partial(upload_to_dynamic, subfolder="shareholder/docs"), blank=True, null=True)
     identity_document_name = models.CharField(max_length=255, blank=True, null=True)
 
 class RDStaff(models.Model):
@@ -853,22 +871,22 @@ class RDStaff(models.Model):
     email = models.EmailField(blank=True, null=True)
     highest_qualification = models.CharField(max_length=255, blank=True, null=True)
     mobile = models.CharField(max_length=20, blank=True, null=True)
-    rd_staf_resume = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="rdstaff/resume"), blank=True, null=True)
+    rd_staf_resume = models.FileField(max_length=512,upload_to=partial(upload_to_dynamic, subfolder="rdstaff/resume"), blank=True, null=True)
     epf_details = models.CharField(max_length=255, blank=True, null=True)
 
 class SubShareHolder(models.Model):
     form_submission = models.ForeignKey(FormSubmission, related_name="sub_shareholders", on_delete=models.CASCADE)
-    share_holder_name = models.CharField(max_length=255, blank=True, null=True)
+    share_holder_name = models.CharField(max_length=512, blank=True, null=True)
     share_percentage = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
-    identity_document = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="subshareholder/docs"), blank=True, null=True)
-    identity_document_name = models.CharField(max_length=255, blank=True, null=True)
-    organization_name_subholder = models.CharField(max_length=200, blank=True, null=True)
+    identity_document = models.FileField(max_length=512,upload_to=partial(upload_to_dynamic, subfolder="subshareholder/docs"), blank=True, null=True)
+    identity_document_name = models.CharField(max_length=512, blank=True, null=True)
+    organization_name_subholder = models.CharField(max_length=512, blank=True, null=True)
 
 
 class TeamMember(models.Model):
     form_submission = models.ForeignKey(FormSubmission, related_name="team_members", on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
-    resumefile = models.FileField(upload_to=partial(upload_to_dynamic, subfolder="Team Resumes/"), blank=True, null=True)
+    resumefile = models.FileField(max_length=512,upload_to=partial(upload_to_dynamic, subfolder="Team Resumes/"), blank=True, null=True)
     resumetext = models.TextField(blank=True, null=True)
     otherdetails = models.TextField(blank=True, null=True)
 
