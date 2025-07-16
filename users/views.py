@@ -115,16 +115,41 @@ from rest_framework.exceptions import AuthenticationFailed, ValidationError as D
 
 
 
-def flatten_errors(detail):
-    # For single key like "non_field_errors", just show its value
+# def flatten_errors(detail):
+#     # For single key like "non_field_errors", just show its value
+#     if isinstance(detail, dict):
+#         if list(detail.keys()) == ["non_field_errors"]:
+#             errors = detail["non_field_errors"]
+#             # Customization:
+#             if isinstance(errors, list) and any("Invalid credentials" in str(e) for e in errors):
+#                 return "Invalid email or password."  # <--- Your custom message here
+#             elif isinstance(errors, list):
+#                 return " ".join(str(e) for e in errors)
+#             return str(errors)
+#         # Otherwise, flatten all fields/messages
+#         messages = []
+#         for field, errors in detail.items():
+#             if isinstance(errors, list):
+#                 for error in errors:
+#                     messages.append(f"{field}: {error}")
+#             else:
+#                 messages.append(f"{field}: {errors}")
+#         return " | ".join(messages)
+#     elif isinstance(detail, list):
+#         return " | ".join([str(e) for e in detail])
+#     return str(detail)
+
+def flatten_errors(detail, sep="\n"):
+    """
+    Flattens DRF validation errors to a user-friendly, bracketless string.
+    """
     if isinstance(detail, dict):
         if list(detail.keys()) == ["non_field_errors"]:
             errors = detail["non_field_errors"]
-            # Customization:
             if isinstance(errors, list) and any("Invalid credentials" in str(e) for e in errors):
-                return "Invalid email or password."  # <--- Your custom message here
+                return "Invalid email or password."
             elif isinstance(errors, list):
-                return " ".join(str(e) for e in errors)
+                return sep.join(str(e) for e in errors)
             return str(errors)
         # Otherwise, flatten all fields/messages
         messages = []
@@ -134,12 +159,10 @@ def flatten_errors(detail):
                     messages.append(f"{field}: {error}")
             else:
                 messages.append(f"{field}: {errors}")
-        return " | ".join(messages)
+        return sep.join(messages)
     elif isinstance(detail, list):
-        return " | ".join([str(e) for e in detail])
+        return sep.join(str(e) for e in detail)
     return str(detail)
-
-
 
 
 class RegisterApplicantView(generics.CreateAPIView):
@@ -190,29 +213,20 @@ class RegisterApplicantView(generics.CreateAPIView):
             }, status=status.HTTP_201_CREATED)
 
         except DRFValidationError as exc:
-            errors = exc.detail
-            message = ""
-            if isinstance(errors, dict):
-                for field, msgs in errors.items():
-                    if isinstance(msgs, list):
-                        for msg in msgs:
-                            message += f"{field.capitalize()}: {msg} "
-                    else:
-                        message += f"{field.capitalize()}: {msgs} "
-            elif isinstance(errors, list):
-                message = " ".join(str(m) for m in errors)
-            else:
-                message = str(errors)
-
+            print("DEBUG FLATTEN ERRORS:", exc.detail)
+            message = flatten_errors(exc.detail)
+            print("DEBUG FLATTENED MESSAGE:", message)
             return Response({
-                "status":           "error",
-                "response_message": message.strip()
+                "status": "error",
+                "response_message": message
             }, status=status.HTTP_400_BAD_REQUEST)
 
+
         except DjangoValidationError as exc:
+            message = flatten_errors(exc.message_dict)
             return Response({
                 "status":           "error",
-                "response_message": exc.message_dict
+                "response_message": message
             }, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:
@@ -619,6 +633,56 @@ class EvaluatorUserListAPIView(APIView):
         return Response(serializer.data)
     
 
+# class InitialSignupView(generics.CreateAPIView):
+#     """POST /initial-signup/ - Initial signup with basic data"""
+#     serializer_class = InitialSignupSerializer
+#     permission_classes = [AllowAny]
+    
+#     def create(self, request, *args, **kwargs):
+#         try:
+#             serializer = self.get_serializer(data=request.data)
+#             serializer.is_valid(raise_exception=True)
+#             user = serializer.save()
+            
+#             # Assign default role
+#             default_role, _ = Role.objects.get_or_create(name="User")
+#             UserRole.objects.create(user=user, role=default_role)
+#             user.is_auth_user = True
+#             user.save(update_fields=["is_auth_user"])
+            
+#             # Generate tokens
+#             refresh = RefreshToken.for_user(user)
+            
+#             user_data = {
+#                 "id": user.id,
+#                 "name": user.full_name,
+#                 "email": user.email,
+#                 "gender": user.get_gender_display(),
+#                 "mobile": user.mobile,
+#                 "organization": user.organization,
+#                 "role": default_role.name,
+#                 "created_at": user.created_at.isoformat(),
+#                 "is_verified": user.is_verified,
+#                 "is_active": user.is_active,
+#                 "profile_completed": False
+#             }
+            
+#             return Response({
+#                 "status": "success",
+#                 "response_message": "Initial signup successful",
+#                 "user": user_data,
+#                 "access_token": str(refresh.access_token),
+#                 "refresh_token": str(refresh),
+#             }, status=status.HTTP_201_CREATED)
+            
+#         except Exception as e:
+#             logger.error(f"Signup error: {str(e)}")
+#             return Response({
+#                 "status": "error",
+#                 "response_message": f"Signup failed: {str(e)}"
+#             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 class InitialSignupView(generics.CreateAPIView):
     """POST /initial-signup/ - Initial signup with basic data"""
     serializer_class = InitialSignupSerializer
@@ -660,12 +724,26 @@ class InitialSignupView(generics.CreateAPIView):
                 "access_token": str(refresh.access_token),
                 "refresh_token": str(refresh),
             }, status=status.HTTP_201_CREATED)
-            
+        
+        except DRFValidationError as exc:
+            message = flatten_errors(exc.detail)
+            return Response({
+                "status": "error",
+                "response_message": message
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        except DjangoValidationError as exc:
+            message = flatten_errors(exc.message_dict)
+            return Response({
+                "status": "error",
+                "response_message": message
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
         except Exception as e:
             logger.error(f"Signup error: {str(e)}")
             return Response({
                 "status": "error",
-                "response_message": f"Signup failed: {str(e)}"
+                "response_message": "Signup failed due to an internal error."
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -773,7 +851,8 @@ class ProfileStatusView(APIView):
                 "status": "error",
                 "response_message": f"Could not check profile completion status: {str(e)}"
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
+
+
 class SubmissionDetailView(APIView):
     
     permission_classes = [IsAuthenticated]
@@ -826,6 +905,7 @@ class SubmissionDetailView(APIView):
                 "status": "error",
                 "response_message": f"Could not retrieve submission details: {str(e)}"
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+  
         
 class AllSubmissionsView(APIView):
    

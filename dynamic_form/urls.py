@@ -13,6 +13,7 @@ router.register(r'submissions', FormSubmissionViewSet,  basename='submission')
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('form-sections/', include('dynamic_form.form_urls')),
     
 ]
 

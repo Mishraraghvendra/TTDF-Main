@@ -56,6 +56,7 @@ class LightningFastEvaluatorAssignmentSerializer(serializers.ModelSerializer):
 class LightningFastTechnicalEvaluationRoundSerializer(serializers.ModelSerializer):
     """Ultra-fast technical evaluation round serializer using cached fields"""
     proposal_id = serializers.SerializerMethodField()
+    call = serializers.SerializerMethodField()
     
     # Use CACHED fields exclusively
     assigned_evaluators_count = serializers.IntegerField(source='cached_assigned_count', read_only=True)
@@ -92,6 +93,21 @@ class LightningFastTechnicalEvaluationRoundSerializer(serializers.ModelSerialize
         if obj.cached_assigned_count == 0:
             return 0
         return round((obj.cached_completed_count / obj.cached_assigned_count) * 100, 1)
+    
+    def get_call(self, obj):
+        # 1. Try from cache if exists
+        if obj.cached_proposal_data and 'call' in obj.cached_proposal_data:
+            return obj.cached_proposal_data.get('call') or 'N/A'
+        # 2. Fallback: Directly from proposal.service.name
+        try:
+            proposal = obj.proposal
+            if proposal and getattr(proposal, 'service', None):
+                name = getattr(proposal.service, 'name', None)
+                return name if name else 'N/A'
+        except Exception:
+            pass
+        return 'N/A'
+
 
 class SuperFastAdminListSerializer(serializers.ModelSerializer):
     """Lightning-fast admin list serializer using ONLY cached data"""

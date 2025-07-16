@@ -47,6 +47,7 @@ urlpatterns = [
     # path('api/api/', include('api.urls')),
     
     path('api/applicant-dashboard/', include('applicant_dashboard.urls')),
+    path('api/form-sections/', include('dynamic_form.form_urls')),
     
 ]
 

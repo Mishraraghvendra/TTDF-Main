@@ -222,6 +222,7 @@ class FormSubmission(models.Model):
     fund_rows = models.JSONField(blank=True, null=True, default=list, help_text="Array of fund entries")
 
     # ---9. Summary Section ---
+    funds_requested= models.PositiveIntegerField(null=True,blank=True) 
     grant_from_ttdf = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
     contribution_applicant = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
     expected_other_contribution = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)

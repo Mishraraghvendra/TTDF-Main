@@ -8,7 +8,7 @@ from milestones.models import Milestone
 from django.shortcuts import get_object_or_404
 from .models import (
     FormSubmission, Collaborator, Equipment, ShareHolder,
-    SubShareHolder, RDStaff, IPRDetails, TeamMember
+    SubShareHolder, RDStaff, IPRDetails, TeamMember, FundLoanDocument
 )
 from .form_serializers import (
     BasicDetailsSerializer, ConsortiumPartnerDetailsSerializer,
@@ -793,40 +793,159 @@ class ProposalDetailsViewSet(FormSectionViewSet):
 
 
 class FundDetailsViewSet(FormSectionViewSet):
-    """Section 4: Fund Details API"""
+    """Section 4: Fund Details API - Loan Document Only"""
     
     @action(detail=False, methods=['get'], url_path='retrieve')
     def get_fund_details(self, request):
+        """Get fund details for a submission"""
         submission_id = request.query_params.get('submission_id')
-        submission = self.get_submission(submission_id)
-        serializer = FundDetailsSerializer(submission)
-        return Response({'success': True, 'data': serializer.data})
+        if not submission_id:
+            return Response({
+                'success': False,
+                'error': 'submission_id is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            submission = self.get_submission(submission_id)
+            serializer = FundDetailsSerializer(submission)
+            return Response({
+                'success': True, 
+                'data': serializer.data
+            })
+        except Exception as e:
+            return Response({
+                'success': False,
+                'error': f'Error retrieving fund details: {str(e)}'
+            }, status=status.HTTP_400_BAD_REQUEST)
     
     @action(detail=False, methods=['post', 'patch'], url_path='update')
     def update_fund_details(self, request):
+        """Update fund details - simplified for loan documents only"""
         submission_id = request.data.get('submission_id')
-        submission = self.get_submission(submission_id)
+        if not submission_id:
+            return Response({
+                'success': False,
+                'error': 'submission_id is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            submission = self.get_submission(submission_id)
+        except Exception as e:
+            return Response({
+                'success': False,
+                'error': f'Invalid submission_id: {str(e)}'
+            }, status=status.HTTP_400_BAD_REQUEST)
         
-        serializer = FundDetailsSerializer(
-            submission, 
-            data=request.data, 
-            partial=True
-        )
         
-        if serializer.is_valid():
-            serializer.save()
+        
+        try:
+            with transaction.atomic():
+                # Handle loan documents - delete existing and create new ones
+                if hasattr(submission, 'fund_loan_documents') and submission.fund_loan_documents.exists():
+                    print(f"🔍 Deleting {submission.fund_loan_documents.count()} existing loan documents")
+                    submission.fund_loan_documents.all().delete()
+                
+                # Create new loan documents
+                loan_docs_created = 0
+                for key, file in request.FILES.items():
+                    if key.startswith('fund_loan_document_'):
+                        try:
+                            FundLoanDocument.objects.create(
+                                form_submission=submission,
+                                document=file
+                            )
+                            loan_docs_created += 1
+                            print(f"📎 Saved loan document: {file.name}")
+                        except Exception as file_error:
+                            print(f"❌ Error saving file {file.name}: {file_error}")
+                            
+                
+                print(f"🔍 Created {loan_docs_created} new loan documents")
+                
+               
+                cleaned_data = {
+                    'submission_id': submission_id,
+                    'has_loan': str(request.data.get('has_loan', 'no')).lower(),
+                    'fund_loan_description': str(request.data.get('fund_loan_description', '')),
+                }
+                
+               
+                try:
+                    loan_amount = request.data.get('fund_loan_amount', 0)
+                    cleaned_data['fund_loan_amount'] = float(loan_amount) if loan_amount else 0
+                except (ValueError, TypeError):
+                    cleaned_data['fund_loan_amount'] = 0
+                
+                print(f"🔍 Cleaned data for serializer: {cleaned_data}")
+                
+                # Update fund details using the serializer with cleaned data
+                serializer = FundDetailsSerializer(
+                    submission, 
+                    data=cleaned_data, 
+                    partial=True
+                )
+                
+                if serializer.is_valid():
+                    serializer.save()
+                    print(f"✅ Fund details updated successfully")
+                    
+                    return Response({
+                        'success': True,
+                        'message': f'Fund details saved successfully ({loan_docs_created} documents uploaded)',
+                        'data': serializer.data
+                    })
+                else:
+                    print(f"❌ Serializer validation failed: {serializer.errors}")
+                    return Response({
+                        'success': False,
+                        'message': 'Validation failed',
+                        'errors': serializer.errors
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                    
+        except Exception as e:
+            print(f"❌ Error updating fund details: {e}")
+            import traceback
+            print(f"❌ Traceback: {traceback.format_exc()}")
+            return Response({
+                'success': False,
+                'error': f'Server error: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=False, methods=['delete'], url_path='delete-document')
+    def delete_loan_document(self, request):
+        """Delete a specific loan document"""
+        document_id = request.query_params.get('document_id')
+        submission_id = request.query_params.get('submission_id')
+        
+        if not document_id or not submission_id:
+            return Response({
+                'success': False,
+                'error': 'document_id and submission_id are required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            submission = self.get_submission(submission_id)
+            document = FundLoanDocument.objects.get(
+                id=document_id,
+                form_submission=submission
+            )
+            document.delete()
+            
             return Response({
                 'success': True,
-                'message': 'Fund details saved successfully',
-                'data': serializer.data
+                'message': 'Loan document deleted successfully'
             })
-        
-        return Response({
-            'success': False,
-            'errors': serializer.errors
-        }, status=400)
-
-
+            
+        except FundLoanDocument.DoesNotExist:
+            return Response({
+                'success': False,
+                'error': 'Document not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({
+                'success': False,
+                'error': f'Error deleting document: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 class BudgetEstimateViewSet(FormSectionViewSet):
     """Section 5: Budget Estimate API"""
     
@@ -976,10 +1095,10 @@ class ObjectiveTimelineViewSet(FormSectionViewSet):
             ).strip()
             
             activities = milestone_info.get('activities', '').strip()
-            time_required = milestone_info.get('timeRequiredMonths') or milestone_info.get('timeRequired') or 0
+            time_required = milestone_info.get('time_required') or milestone_info.get('timeRequiredMonths') or milestone_info.get('timeRequired') or 0
             
             # Only include milestones with actual content
-            if scope_of_work and activities and float(time_required) > 0:
+            if scope_of_work or activities or float(time_required) >= 0:
                 valid_milestones.append({
                     'index': i,
                     'data': milestone_info,
