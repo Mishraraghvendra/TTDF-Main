@@ -171,6 +171,9 @@ class AdministrativeScreeningSerializer(serializers.ModelSerializer):
     administrativeScreeningDocument = serializers.SerializerMethodField()
     admin_decision = serializers.SerializerMethodField()
     current_stage = serializers.SerializerMethodField()
+    committee_assigned = serializers.SerializerMethodField()
+    
+
 
     class Meta:
         model = FormSubmission
@@ -178,8 +181,13 @@ class AdministrativeScreeningSerializer(serializers.ModelSerializer):
             'id','call','orgType','orgName','subject','description','status',
             'fundsRequested','fundsGranted','applicationDocument','shortlist',
             'submissionDate','contactPerson','contactEmail','committeeDetails',
-            'technical_evaluated','administrativeScreeningDocument','admin_decision','current_stage'
+            'technical_evaluated','administrativeScreeningDocument','admin_decision','current_stage','committee_assigned'
         ]
+
+    
+    def get_committee_assigned(self, obj):
+        return getattr(obj, 'committee_assigned', None)
+
 
     def to_representation(self, instance):
         # Cache the latest related objects ONCE per instance using prefetch cache
@@ -407,6 +415,9 @@ class AdminScreeningSerializer(serializers.ModelSerializer):
     admin_evaluated = serializers.SerializerMethodField()
     admin_decision = serializers.SerializerMethodField()
     current_stage = serializers.SerializerMethodField()
+    committee_assigned = serializers.SerializerMethodField()
+
+    
 
     class Meta:
         model = FormSubmission
@@ -414,8 +425,13 @@ class AdminScreeningSerializer(serializers.ModelSerializer):
             'id', 'call', 'orgType', 'orgName', 'subject', 'description',
             'fundsRequested', 'fundsGranted', 'applicationDocument', 'shortlist',
             'submissionDate', 'contactPerson', 'contactEmail', 'committeeDetails',
-            'evaluated_document', 'admin_evaluated', 'admin_decision', 'current_stage'
+            'evaluated_document', 'admin_evaluated', 'admin_decision', 'current_stage','committee_assigned'
         ]
+
+
+    def get_committee_assigned(self, obj):
+        return getattr(obj, 'committee_assigned', None)
+        
 
     def _get_latest_screening(self, obj):
         sid = getattr(obj, 'latest_screening_id', None)

@@ -961,25 +961,102 @@ class BudgetEstimateViewSet(FormSectionViewSet):
         submission_id = request.data.get('submission_id')
         submission = self.get_submission(submission_id)
         
+        print(f"🔍 Budget Estimate Update - Submission: {submission_id}")
+        print(f"🔍 Request data keys: {list(request.data.keys())}")
+        
+        # Extract the data
+        budget_estimate_data = request.data.get('budget_estimate', {})
+        equipment_overhead_data = request.data.get('equipment_overhead', {})
+        income_estimate_data = request.data.get('income_estimate', {})
+        
+        print(f"🔍 Equipment overhead data received: {equipment_overhead_data}")
+        
+        # 🔧 FIX: Ensure equipment_overhead has proper structure
+        if not equipment_overhead_data or 'tables' not in equipment_overhead_data:
+            print("🔧 Equipment overhead data is empty, creating default structure")
+            equipment_overhead_data = {
+                "tables": [
+                    {
+                        "id": "table-2",
+                        "title": "Equipment Overhead",
+                        "serviceOfferings": [
+                            {
+                                "id": "offering-1",
+                                "name": "Enter Service Name...",
+                                "items": [
+                                    {
+                                        "id": "item-1",
+                                        "description": "",
+                                        "financials": {
+                                            "capex": {
+                                                "year0": {
+                                                    "description": "",
+                                                    "cost": 0,
+                                                    "qty": 0,
+                                                    "total": 0,
+                                                    "grant": 0,
+                                                    "remarks": "",
+                                                },
+                                            },
+                                            "opex": {
+                                                "year1": {
+                                                    "description": "",
+                                                    "cost": 0,
+                                                    "qty": 0,
+                                                    "total": 0,
+                                                    "grant": 0,
+                                                    "remarks": "",
+                                                },
+                                                "year2": {
+                                                    "description": "",
+                                                    "cost": 0,
+                                                    "qty": 0,
+                                                    "total": 0,
+                                                    "grant": 0,
+                                                    "remarks": "",
+                                                },
+                                            },
+                                        },
+                                    },
+                                ],
+                            },
+                        ],
+                    }
+                ]
+            }
+        
+        # Prepare data for serializer
+        serializer_data = {
+            'submission_id': submission_id,
+            'budget_estimate': budget_estimate_data,
+            'equipment_overhead': equipment_overhead_data,
+            'income_estimate': income_estimate_data,
+            'manpower_details': request.data.get('manpower_details', []),
+            'other_requirements': request.data.get('other_requirements', []),
+        }
+        
+        print(f"🔍 Final equipment overhead being saved: {equipment_overhead_data}")
+        
         serializer = BudgetEstimateSerializer(
             submission, 
-            data=request.data, 
+            data=serializer_data, 
             partial=True
         )
         
         if serializer.is_valid():
             serializer.save()
+            print("✅ Budget estimate saved successfully")
             return Response({
                 'success': True,
                 'message': 'Budget estimate saved successfully',
                 'data': serializer.data
             })
-        
-        return Response({
-            'success': False,
-            'errors': serializer.errors
-        }, status=400)
-
+        else:
+            print(f"❌ Serializer errors: {serializer.errors}")
+            return Response({
+                'success': False,
+                'errors': serializer.errors
+            }, status=400)
 
 class FinanceDetailsViewSet(FormSectionViewSet):
     """Section 6: Finance Details API"""

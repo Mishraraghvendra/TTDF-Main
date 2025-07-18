@@ -13,7 +13,7 @@ class BasicDetailsSerializer(serializers.ModelSerializer):
     class Meta:
         model = FormSubmission
         fields = [
-            'id', 'form_id', 'proposal_id', 'status',
+            'id', 'form_id', 'proposal_id', 'status', 
             'individual_pan', 'pan_file', 'subject', 'description'
         ]
         read_only_fields = ['id', 'form_id', 'proposal_id']
@@ -45,7 +45,7 @@ class BasicDetailsSerializer(serializers.ModelSerializer):
                     'streetVillage': profile.street_village or '',
                     'city': profile.city or '',
                     'country': profile.country or '',
-                    'state': profile.state or '',
+                    'state': profile.state or '', 
                     'pincode': profile.pincode or '',
                     'landline_number': profile.landline_number or '',
                     'landline': profile.landline_number or '',
@@ -64,6 +64,8 @@ class BasicDetailsSerializer(serializers.ModelSerializer):
                     'dsirCertificate': profile.dsir_certificate.url if profile.dsir_certificate else None,
                     'tan_pan_cin': profile.tan_pan_cin.url if profile.tan_pan_cin else None,
                     'individualPanAttachment': profile.tan_pan_cin.url if profile.tan_pan_cin else None,
+                    'companyAsPerCfp': profile.companyAsPerCfp or '',
+                    
                 })
             else:
                 data.update({
@@ -77,6 +79,7 @@ class BasicDetailsSerializer(serializers.ModelSerializer):
                     'share_holding_pattern': None, 'shareHoldingPattern': None,
                     'dsir_certificate': None, 'dsirCertificate': None,
                     'tan_pan_cin': None, 'individualPanAttachment': None,
+                     'companyAsPerCfp': '',
                 })
         else:
             data.update({
@@ -91,6 +94,7 @@ class BasicDetailsSerializer(serializers.ModelSerializer):
                 'share_holding_pattern': None, 'shareHoldingPattern': None,
                 'dsir_certificate': None, 'dsirCertificate': None,
                 'tan_pan_cin': None, 'individualPanAttachment': None,
+                'companyAsPerCfp': '',
             })
         
         # Handle FormSubmission pan_file
@@ -513,6 +517,59 @@ class BudgetEstimateSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'form_id', 'proposal_id']
     
+    def get_default_equipment_table(self):
+        """Ensure equipment overhead always has proper structure"""
+        return {
+            "tables": [
+                {
+                    "id": "table-2",
+                    "title": "Equipment Overhead",
+                    "serviceOfferings": [
+                        {
+                            "id": "offering-1",
+                            "name": "Enter Service Name...",
+                            "items": [
+                                {
+                                    "id": "item-1",
+                                    "description": "",
+                                    "financials": {
+                                        "capex": {
+                                            "year0": {
+                                                "description": "",
+                                                "cost": 0,
+                                                "qty": 0,
+                                                "total": 0,
+                                                "grant": 0,
+                                                "remarks": "",
+                                            },
+                                        },
+                                        "opex": {
+                                            "year1": {
+                                                "description": "",
+                                                "cost": 0,
+                                                "qty": 0,
+                                                "total": 0,
+                                                "grant": 0,
+                                                "remarks": "",
+                                            },
+                                            "year2": {
+                                                "description": "",
+                                                "cost": 0,
+                                                "qty": 0,
+                                                "total": 0,
+                                                "grant": 0,
+                                                "remarks": "",
+                                            },
+                                        },
+                                    },
+                                },
+                            ],
+                        },
+                    ],
+                }
+            ]
+        }
+    
     def to_representation(self, instance):
         data = super().to_representation(instance)
         
@@ -520,8 +577,15 @@ class BudgetEstimateSerializer(serializers.ModelSerializer):
         data['budget_estimate'] = instance.budget_estimate or {}
         data['budgetEstimate'] = instance.budget_estimate or {}
         
-      
-        data['equipment_overhead'] = instance.equipment_overhead or {}
+        # 🔧 FIX: Ensure equipment_overhead always has proper structure
+        equipment_overhead = instance.equipment_overhead or {}
+        
+        # If equipment_overhead is empty or missing tables, use default structure
+        if not equipment_overhead or 'tables' not in equipment_overhead or not equipment_overhead['tables']:
+            print("🔧 Equipment overhead missing or empty, using default structure")
+            equipment_overhead = self.get_default_equipment_table()
+        
+        data['equipment_overhead'] = equipment_overhead
         
         data['income_estimate'] = instance.income_estimate or {}
         data['incomeEstimate'] = instance.income_estimate or {}
@@ -530,11 +594,14 @@ class BudgetEstimateSerializer(serializers.ModelSerializer):
         data['other_requirements'] = instance.other_requirements or ''
         data['otherRequirements'] = instance.other_requirements or ''
         
-        # 🔧 ALSO ADD: Direct access to tables for backward compatibility
+        # Direct access to tables for backward compatibility
         if instance.budget_estimate and 'tables' in instance.budget_estimate:
             data['tables'] = instance.budget_estimate['tables']
         
-        return data 
+        return data
+    
+
+
 
 class FinanceDetailsSerializer(serializers.ModelSerializer):
     class Meta:

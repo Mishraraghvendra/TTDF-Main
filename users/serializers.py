@@ -596,5 +596,5 @@ class ProfileGetSerializer(serializers.ModelSerializer):
             'applicant_passport', 'organization_registration_certificate',
             'approval_certificate', 'three_years_financial_report',
             'is_organization_domestic', 'share_holding_pattern', 'dsir_certificate',
-            'id_type', 'id_number','individualPAN',
+            'id_type', 'id_number','individualPAN', 'individualPanAttachment','tan_pan_cin'
         ]
