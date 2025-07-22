@@ -566,6 +566,9 @@ class CommitteeMember(models.Model):
 
     def __str__(self):
         return f"{self.user.get_full_name() or self.user.email} in {self.committee.name}"
+    
+
+    
 
 class ScreeningWorkflowConfig(models.Model):
     service = models.OneToOneField(Service, on_delete=models.CASCADE, related_name='workflow_config')

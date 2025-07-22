@@ -920,7 +920,7 @@ class ScreeningCommitteeViewSet(viewsets.ModelViewSet):
             return Response({"message": "Head removed successfully"})
             
         try:
-            user_id = int(user_id)
+            user_id = int(user_id)  
             user = User.objects.get(id=user_id)
             
             
@@ -1025,6 +1025,8 @@ class ScreeningCommitteeViewSet(viewsets.ModelViewSet):
         screenings = committee.screenings.all()
         serializer = ScreeningResultSerializer(screenings, many=True)
         return Response(serializer.data)
+
+
 
 
 class CommitteeMemberViewSet(viewsets.ModelViewSet):

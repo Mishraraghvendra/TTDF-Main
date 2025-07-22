@@ -172,6 +172,8 @@ class AdministrativeScreeningSerializer(serializers.ModelSerializer):
     admin_decision = serializers.SerializerMethodField()
     current_stage = serializers.SerializerMethodField()
     committee_assigned = serializers.SerializerMethodField()
+    is_committee_created = serializers.SerializerMethodField()
+    village_name = serializers.SerializerMethodField()
     
 
 
@@ -181,9 +183,18 @@ class AdministrativeScreeningSerializer(serializers.ModelSerializer):
             'id','call','orgType','orgName','subject','description','status',
             'fundsRequested','fundsGranted','applicationDocument','shortlist',
             'submissionDate','contactPerson','contactEmail','committeeDetails',
-            'technical_evaluated','administrativeScreeningDocument','admin_decision','current_stage','committee_assigned'
+            'technical_evaluated','administrativeScreeningDocument','admin_decision',
+            'current_stage','committee_assigned','village_name'
         ]
 
+    
+    def get_village_name(self, obj):
+        if not obj.proposed_village:
+            return ""
+        field = obj._meta.get_field('proposed_village')
+        return dict(field.choices).get(obj.proposed_village, obj.proposed_village)    
+
+   
     
     def get_committee_assigned(self, obj):
         return getattr(obj, 'committee_assigned', None)
@@ -287,6 +298,8 @@ class AdministrativeScreeningSerializer(serializers.ModelSerializer):
         admin_record = getattr(obj, '_latest_screening_record', None)
         return admin_record.evaluated_document.url if admin_record and admin_record.evaluated_document else None
 
+
+
 # Technical Screening
 class TechnicalScreeningDashboardSerializer(serializers.ModelSerializer):
     id = serializers.CharField(source='proposal_id')
@@ -307,7 +320,9 @@ class TechnicalScreeningDashboardSerializer(serializers.ModelSerializer):
     technical_evaluated = serializers.SerializerMethodField()
     technical_decision = serializers.SerializerMethodField()
     technicalScreeningDocument = serializers.SerializerMethodField()
-    shortlist = serializers.SerializerMethodField()  # Added this field
+    shortlist = serializers.SerializerMethodField()  
+    village_name = serializers.SerializerMethodField()
+     
 
     class Meta:
         model = FormSubmission
@@ -316,8 +331,15 @@ class TechnicalScreeningDashboardSerializer(serializers.ModelSerializer):
             'fundsRequested','fundsGranted','applicationDocument',
             'submissionDate','contactPerson','contactEmail','committeeDetails',
             'administrativeScreeningDocument','technical_evaluated','technical_decision',
-            'technicalScreeningDocument','shortlist'
+            'technicalScreeningDocument','shortlist','village_name'
         ]
+    
+    def get_village_name(self, obj):
+        if not obj.proposed_village:
+            return ""
+        field = obj._meta.get_field('proposed_village')
+        return dict(field.choices).get(obj.proposed_village, obj.proposed_village) 
+
     
     def get_status(self, obj):
         admin_record = obj.screening_records.order_by('-cycle').first()
@@ -416,6 +438,8 @@ class AdminScreeningSerializer(serializers.ModelSerializer):
     admin_decision = serializers.SerializerMethodField()
     current_stage = serializers.SerializerMethodField()
     committee_assigned = serializers.SerializerMethodField()
+    is_committee_created = serializers.SerializerMethodField()
+    village_name = serializers.SerializerMethodField()
 
     
 
@@ -425,9 +449,27 @@ class AdminScreeningSerializer(serializers.ModelSerializer):
             'id', 'call', 'orgType', 'orgName', 'subject', 'description',
             'fundsRequested', 'fundsGranted', 'applicationDocument', 'shortlist',
             'submissionDate', 'contactPerson', 'contactEmail', 'committeeDetails',
-            'evaluated_document', 'admin_evaluated', 'admin_decision', 'current_stage','committee_assigned'
+            'evaluated_document', 'admin_evaluated', 'admin_decision', 'current_stage',
+            'committee_assigned','is_committee_created','village_name'
         ]
 
+    
+    def get_village_name(self, obj):
+        if not obj.proposed_village:
+            return ""
+        field = obj._meta.get_field('proposed_village')
+        return dict(field.choices).get(obj.proposed_village, obj.proposed_village)
+    
+    
+    def get_is_committee_created(self, obj):
+        from configuration.models import ScreeningCommittee
+        exists = ScreeningCommittee.objects.filter(
+            service=obj.service,
+            committee_type='administrative'
+        ).exists()
+        # print('is_committee_created for', obj.id, ':', exists)
+        return exists
+    
 
     def get_committee_assigned(self, obj):
         return getattr(obj, 'committee_assigned', None)
@@ -591,6 +633,8 @@ class AdminTechnicalScreeningSerializer(serializers.ModelSerializer):
     technical_evaluated = serializers.BooleanField()
     administrativeDocument = serializers.SerializerMethodField()
     admin_evaluated = serializers.SerializerMethodField()
+    village_name = serializers.SerializerMethodField()
+    
 
     class Meta:
         model = TechnicalScreeningRecord
@@ -598,11 +642,20 @@ class AdminTechnicalScreeningSerializer(serializers.ModelSerializer):
             'id','call','orgType','orgName','subject','description',
             'fundsRequested','fundsGranted','shortlist','submissionDate',
             'contactPerson','contactEmail','committeeDetails',
-            'proposalDocument','document','technical_evaluated','status','administrativeDocument','admin_evaluated',
+            'proposalDocument','document','technical_evaluated','status','administrativeDocument','admin_evaluated','village_name'
         ]
+
+    
+    def get_village_name(self, obj):
+        if not obj.proposed_village:
+            return ""
+        field = obj._meta.get_field('proposed_village')
+        return dict(field.choices).get(obj.proposed_village, obj.proposed_village)   
+     
 
     def get_status(self, obj):
         return getattr(obj, 'technical_decision', None)   
+    
     
     def get_contactPerson(self, obj):
         proposal = getattr(obj.screening_record, 'proposal', None)

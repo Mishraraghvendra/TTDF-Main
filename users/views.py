@@ -107,7 +107,7 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from django.core.exceptions import ValidationError as DjangoValidationError
-from .serializers import ApplicantRegistrationSerializer
+from .serializers import ApplicantRegistrationSerializer,SimpleUserSerializer
 from .models import Role, UserRole  # Update import as per your project
 from rest_framework.exceptions import AuthenticationFailed, ValidationError as DRFValidationError
 
@@ -975,3 +975,22 @@ class AllSubmissionsView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+
+
+class UserListApi(APIView):
+    def get(self, request, *args, **kwargs):
+        try:
+            # Only get users who are authorized AND NOT applicants
+            users = User.objects.filter(is_auth_user=True, is_applicant=False)
+            if not users.exists():
+                return Response({'error': 'No authorized non-applicant users found.'}, status=status.HTTP_404_NOT_FOUND)
+            serializer = SimpleUserSerializer(users, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(
+                {'error': f"An error occurred: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

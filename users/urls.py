@@ -15,7 +15,7 @@ from .views import (
     PasswordResetConfirmView,
     AssignRoleView, AssignPermissionView,ChangeUserRoleView,EvaluatorUserListAPIView,
     InitialSignupView,GetProfileView,UpdateProfileView,ProfileStatusView,
-    SubmissionDetailView,AllSubmissionsView,ChangePasswordView,AdminChangeUserPasswordView
+    SubmissionDetailView,AllSubmissionsView,ChangePasswordView,AdminChangeUserPasswordView,UserListApi
 )
 
 router = DefaultRouter()
@@ -45,4 +45,5 @@ urlpatterns = [
     path('profile-status/', ProfileStatusView.as_view(), name='profile-status'),
     path('submission-detail/', SubmissionDetailView.as_view(), name='submission-detail'),
     path('all-submissions/', AllSubmissionsView.as_view(), name='all-submissions'),
+    path('simple-list/', UserListApi.as_view(), name='user-simple-list'),
 ]

@@ -445,9 +445,10 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
         return obj.service.name if obj.service else None
 
     def get_last_updated(self, obj):
-        if obj.updated_at:
-            return timezone.localtime(obj.updated_at).strftime('%Y-%m-%d %H:%M:%S')
-        return None
+            if obj.updated_at:
+                local_dt = timezone.localtime(obj.updated_at)  # <-- Convert to local timezone!
+                return local_dt.strftime("%d %b %Y, %I:%M %p")
+            return None
 
     def get_create_date(self, obj):
         if obj.created_at:
@@ -460,90 +461,6 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
             return None
         return FullProfileSerializer(profile).data
 
-    # def validate(self, data):
-    #     from dynamic_form.models import Collaborator  # adjust import if needed
-
-    #     collaborators = data.get('collaborators', [])
-    #     proposed_village = data.get('proposed_village') or (self.instance and self.instance.proposed_village)
-    #     orgs_seen = set()
-    #     pans_seen = set()
-
-    #     # === Print ALL collaborators in DB for debugging ===
-    #     print("\n=== ALL Collaborators in DB BEFORE VALIDATION ===")
-    #     all_collabs = Collaborator.objects.all().order_by("id")
-    #     for c in all_collabs:
-    #         print(f"ID: {c.id} | Org: '{c.organization_name_collab}' | PAN: '{c.pan_file_name_collab}' | Village: '{getattr(c.form_submission, 'proposed_village', None)}' | Submission: {getattr(c.form_submission, 'id', None)}")
-    #     print("=== END ALL COLLABORATORS IN DB ===")
-
-    #     print("\n==== Collaborator Uniqueness Check START ====")
-    #     print(f"Proposed village: {proposed_village}")
-    #     print(f"Collaborators in submission: {len(collaborators)}")
-
-    #     # 1. Check for duplicates *within this request*
-    #     for collab in collaborators:
-    #         org = (collab.get('organization_name_collab') or '').strip().lower()
-    #         pan = (collab.get('pan_file_name_collab') or '').strip().upper()
-    #         print(f"  Collaborator: org='{org}' pan='{pan}'")
-    #         if org and org in orgs_seen:
-    #             print(f"❌ Duplicate org in this submission: {org}")
-    #             raise serializers.ValidationError(f"Duplicate organization '{org}' in collaborators for this submission.")
-    #         if pan and pan in pans_seen:
-    #             print(f"❌ Duplicate PAN in this submission: {pan}")
-    #             raise serializers.ValidationError(f"Duplicate PAN '{pan}' in collaborators for this submission.")
-    #         orgs_seen.add(org)
-    #         pans_seen.add(pan)
-
-    #     # 2. Check against DB (print all found)
-    #     for org in orgs_seen:
-    #         db_qs = Collaborator.objects.filter(
-    #             organization_name_collab__iexact=org,
-    #             form_submission__proposed_village=proposed_village,
-    #         )
-    #         if self.instance:
-    #             db_qs = db_qs.exclude(form_submission=self.instance)
-    #         db_count = db_qs.count()
-    #         print(f"DB check for org '{org}' in village '{proposed_village}': found {db_count} records.")
-    #         if db_count > 0:
-    #             for c in db_qs:
-    #                 print(f"  -> DB match org: {c.organization_name_collab} | PAN: {c.pan_file_name_collab} | Submission: {getattr(c.form_submission, 'id', None)}")
-    #             raise serializers.ValidationError(
-    #                 f"Collaborator with organization '{org}' already exists for village '{proposed_village}'."
-    #             )
-
-    #     for pan in pans_seen:
-    #         if not pan:
-    #             continue
-    #         db_qs = Collaborator.objects.filter(
-    #             pan_file_name_collab__iexact=pan,
-    #             form_submission__proposed_village=proposed_village,
-    #         )
-    #         if self.instance:
-    #             db_qs = db_qs.exclude(form_submission=self.instance)
-    #         db_count = db_qs.count()
-    #         print(f"DB check for PAN '{pan}' in village '{proposed_village}': found {db_count} records.")
-    #         if db_count > 0:
-    #             for c in db_qs:
-    #                 print(f"  -> DB match org: {c.organization_name_collab} | PAN: {c.pan_file_name_collab} | Submission: {getattr(c.form_submission, 'id', None)}")
-    #             raise serializers.ValidationError(
-    #                 f"Collaborator with PAN '{pan}' already exists for village '{proposed_village}'."
-    #             )
-
-    #     print("==== Collaborator Uniqueness Check PASSED ====\n")
-
-    #     # --- Template/business rule checks
-    #     tpl = data.get('template') or (self.instance.template if self.instance else None)
-    #     if tpl:
-    #         now = timezone.now()
-    #         if not tpl.is_active:
-    #             raise serializers.ValidationError("Form not active.")
-    #         if tpl.start_date and now < tpl.start_date:
-    #             raise serializers.ValidationError("Not open yet.")
-    #         if tpl.end_date and now > tpl.end_date:
-    #             raise serializers.ValidationError("Deadline passed.")
-    #         if self.instance and not self.instance.can_edit():
-    #             raise serializers.ValidationError("Cannot edit after deadline/final submit.")
-
-    #     return data
 
     def _inject_file_objects(self, records, file_field_names):
         """Inject file objects from request.FILES into record dictionaries"""
@@ -834,6 +751,21 @@ class FormSubmissionSerializer(serializers.ModelSerializer):
 
         return instance
     
+
+
+
+
+
+
+
+class ProposalVillageListSerializer(serializers.ModelSerializer):
+    service_name = serializers.CharField(source='service.name', default='', read_only=True)
+    template_title = serializers.CharField(source='template.title', default='', read_only=True)
+
+    class Meta:
+        model = FormSubmission
+        fields = ['proposal_id', 'status', 'proposed_village', 'service_name', 'template_title']
+
 
 
 

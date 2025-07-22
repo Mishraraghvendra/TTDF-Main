@@ -1,5 +1,5 @@
 # dynamic_form/form_views.py 
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status,serializers
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -20,6 +20,7 @@ from .form_serializers import (
     TeamMemberSerializer
 )
 from users.utils import upsert_profile_and_user_from_submission
+from django.db import IntegrityError
 
 
 class FormSectionViewSet(viewsets.ViewSet):
@@ -728,6 +729,69 @@ class ProposalDetailsViewSet(FormSectionViewSet):
                 'errors': serializer.errors
             }, status=400)
     
+    # @action(detail=False, methods=['post'])
+    # def add_team_member(self, request):
+    #     """Add new team member"""
+    #     submission_id = request.data.get('submission_id')
+    #     submission = self.get_submission(submission_id)
+        
+    #     serializer = TeamMemberSerializer(data=request.data)
+    #     if serializer.is_valid():
+    #         serializer.save(form_submission=submission)
+    #         return Response({
+    #             'success': True,
+    #             'message': 'Team member added successfully',
+    #             'data': serializer.data
+    #         })
+        
+    #     return Response({
+    #         'success': False,
+    #         'errors': serializer.errors
+    #     }, status=400)
+    
+    # @action(detail=False, methods=['patch'])
+    # def update_team_member(self, request):
+    #     """Update existing team member"""
+    #     team_member_id = request.data.get('team_member_id')
+    #     team_member = get_object_or_404(
+    #         TeamMember, 
+    #         id=team_member_id,
+    #         form_submission__applicant=request.user
+    #     )
+        
+    #     serializer = TeamMemberSerializer(
+    #         team_member, 
+    #         data=request.data, 
+    #         partial=True
+    #     )
+    #     if serializer.is_valid():
+    #         serializer.save()
+    #         return Response({
+    #             'success': True,
+    #             'message': 'Team member updated successfully',
+    #             'data': serializer.data
+    #         })
+        
+    #     return Response({
+    #         'success': False,
+    #         'errors': serializer.errors
+    #     }, status=400)
+    
+    # @action(detail=False, methods=['delete'])
+    # def delete_team_member(self, request):
+    #     """Delete team member"""
+    #     team_member_id = request.query_params.get('team_member_id')
+    #     team_member = get_object_or_404(
+    #         TeamMember, 
+    #         id=team_member_id,
+    #         form_submission__applicant=request.user
+    #     )
+    #     team_member.delete()
+    #     return Response({
+    #         'success': True,
+    #         'message': 'Team member deleted successfully'
+    #     })
+
     @action(detail=False, methods=['post'])
     def add_team_member(self, request):
         """Add new team member"""
@@ -736,18 +800,28 @@ class ProposalDetailsViewSet(FormSectionViewSet):
         
         serializer = TeamMemberSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(form_submission=submission)
+            try:
+                serializer.save(form_submission=submission)
+            except IntegrityError:
+                return Response({
+                    'success': False,
+                    'errors': {
+                        'non_field_errors': [
+                            "A team member with the same name and other details already exists for this proposal."
+                        ]
+                    }
+                }, status=400)
             return Response({
                 'success': True,
                 'message': 'Team member added successfully',
                 'data': serializer.data
             })
-        
+
         return Response({
             'success': False,
             'errors': serializer.errors
         }, status=400)
-    
+
     @action(detail=False, methods=['patch'])
     def update_team_member(self, request):
         """Update existing team member"""
@@ -764,7 +838,17 @@ class ProposalDetailsViewSet(FormSectionViewSet):
             partial=True
         )
         if serializer.is_valid():
-            serializer.save()
+            try:
+                serializer.save()
+            except IntegrityError:
+                return Response({
+                    'success': False,
+                    'errors': {
+                        'non_field_errors': [
+                            "A team member with the same name and other details already exists for this proposal."
+                        ]
+                    }
+                }, status=400)
             return Response({
                 'success': True,
                 'message': 'Team member updated successfully',
@@ -775,7 +859,7 @@ class ProposalDetailsViewSet(FormSectionViewSet):
             'success': False,
             'errors': serializer.errors
         }, status=400)
-    
+
     @action(detail=False, methods=['delete'])
     def delete_team_member(self, request):
         """Delete team member"""
@@ -946,6 +1030,7 @@ class FundDetailsViewSet(FormSectionViewSet):
                 'success': False,
                 'error': f'Error deleting document: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 class BudgetEstimateViewSet(FormSectionViewSet):
     """Section 5: Budget Estimate API"""
     
@@ -1072,7 +1157,9 @@ class FinanceDetailsViewSet(FormSectionViewSet):
     def update_finance_details(self, request):
         submission_id = request.data.get('submission_id')
         submission = self.get_submission(submission_id)
-        
+        print("Incoming funds_requested:", request.data.get('funds_requested'))
+        print("incoming grant ",request.data.get('grant_from_ttdf'))
+        print("incoming total ",request.data.get('actual_contribution_applicant'))
         serializer = FinanceDetailsSerializer(
             submission, 
             data=request.data, 
@@ -1211,8 +1298,18 @@ class ObjectiveTimelineViewSet(FormSectionViewSet):
                     time_required = milestone_info['time_required']
                     
                     # Handle grant amounts
-                    grant_from_ttdf = float(milestone_data_item.get('ttdfGrantINR') or 
-                                          milestone_data_item.get('grantFromTtdf') or 0)
+                    # grant_from_ttdf = float(milestone_data_item.get('ttdfGrantINR') or 
+                    #                       milestone_data_item.get('grantFromTtdf') or 0)
+
+                    grant_from_ttdf = float(
+                        milestone_data_item.get('grant_from_ttdf')
+                        if 'grant_from_ttdf' in milestone_data_item and milestone_data_item.get('grant_from_ttdf') is not None
+                        # else milestone_data_item.get('ttdfGrantINR')
+                        # if 'ttdfGrantINR' in milestone_data_item and milestone_data_item.get('ttdfGrantINR') is not None
+                        # else milestone_data_item.get('grantFromTtdf')
+                        # if 'grantFromTtdf' in milestone_data_item and milestone_data_item.get('grantFromTtdf') is not None
+                        else 0
+                    )
                     
                     # Handle applicant contribution
                     initial_contri_applicant = float(milestone_data_item.get('applicantContributionINR') or 
@@ -1329,6 +1426,7 @@ class ObjectiveTimelineViewSet(FormSectionViewSet):
                 'success': True,
                 'message': 'No auto-generated milestones found'
             })
+
 class IPRDetailsViewSet(FormSectionViewSet):
     """Section 8: IPR Details API"""
     
@@ -1546,6 +1644,7 @@ class ProjectDetailsViewSet(FormSectionViewSet):
                 'success': False,
                 'errors': serializer.errors
             }, status=400)
+
 class DeclarationViewSet(FormSectionViewSet):
     """Declaration API"""
     
@@ -1584,32 +1683,74 @@ class DeclarationViewSet(FormSectionViewSet):
 class FormSubmissionControlViewSet(FormSectionViewSet):
     """Form submission control - submit, get status, etc."""
     
+    # @action(detail=False, methods=['post'], url_path='submit')
+    # def submit_form(self, request):
+    #     """Submit the complete form"""
+    #     submission_id = request.data.get('submission_id')
+    #     submission = self.get_submission(submission_id)
+        
+    #     # Validate all required sections are complete
+    #     validation_errors = self._validate_complete_submission(submission)
+    #     if validation_errors:
+    #         return Response({
+    #             'success': False,
+    #             'message': 'Form validation failed',
+    #             'errors': validation_errors
+    #         }, status=400)
+        
+    #     # Update status to submitted
+    #     submission.status = FormSubmission.SUBMITTED
+    #     submission.save()
+        
+    #     return Response({
+    #         'success': True,
+    #         'message': 'Form submitted successfully',
+    #         'proposal_id': submission.proposal_id,
+    #         'form_id': submission.form_id
+    #     })
+    
     @action(detail=False, methods=['post'], url_path='submit')
     def submit_form(self, request):
         """Submit the complete form"""
         submission_id = request.data.get('submission_id')
         submission = self.get_submission(submission_id)
+
+        # Gather the latest data for validation (combine instance and incoming data)
+        input_data = {f.name: getattr(submission, f.name) for f in submission._meta.fields}
+        input_data.update(request.data)  # In case you support partial updates
         
-        # Validate all required sections are complete
+        # 1. Built-in required section validation
         validation_errors = self._validate_complete_submission(submission)
         if validation_errors:
             return Response({
                 'success': False,
                 'message': 'Form validation failed',
                 'errors': validation_errors
-            }, status=400)
-        
-        # Update status to submitted
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # 2. Custom deep validation
+        try:
+            self.validate(input_data, instance=submission)
+        except serializers.ValidationError as exc:
+            return Response({
+                'success': False,
+                'message': 'Custom validation failed',
+                'errors': exc.detail
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # 3. Submit the form
         submission.status = FormSubmission.SUBMITTED
         submission.save()
-        
+
         return Response({
             'success': True,
             'message': 'Form submitted successfully',
             'proposal_id': submission.proposal_id,
             'form_id': submission.form_id
-        })
-    
+        }, status=status.HTTP_200_OK)
+
+
+
     @action(detail=False, methods=['get'], url_path='status')
     def get_status(self, request):
         """Get form submission status"""
@@ -1752,3 +1893,70 @@ class FormSubmissionControlViewSet(FormSectionViewSet):
             errors['basic_details'] = 'Qualification is required'
         
         return errors
+    
+
+
+    def validate(self, data, instance=None):
+        from rest_framework import serializers
+        errors = {}
+
+        # Example field validation
+        if not data.get('individual_pan') and not (instance and instance.individual_pan):
+            errors['individual_pan'] = 'PAN is required.'
+
+        if hasattr(instance.applicant, 'profile') and not instance.applicant.profile.qualification:
+            errors['qualification'] = 'Qualification is required in applicant profile.'
+
+        # Collaborator uniqueness validation
+        if instance:
+            proposed_village = data.get('proposed_village') or getattr(instance, 'proposed_village', None)
+            collaborators = Collaborator.objects.filter(form_submission=instance)
+            orgs_seen = set()
+            pans_seen = set()
+
+            for collab in collaborators:
+                org = (collab.organization_name_collab or '').strip().lower()
+                pan = (collab.pan_file_name_collab or '').strip().upper()
+                if org and org in orgs_seen:
+                    raise serializers.ValidationError(f"Duplicate organization '{org}' in collaborators for this submission.")
+                if pan and pan in pans_seen:
+                    raise serializers.ValidationError(f"Duplicate PAN '{pan}' in collaborators for this submission.")
+                orgs_seen.add(org)
+                pans_seen.add(pan)
+
+            # Database duplicate checks for org and pan
+            for org in orgs_seen:
+                db_qs = Collaborator.objects.filter(
+                    organization_name_collab__iexact=org,
+                    form_submission__proposed_village=proposed_village,
+                    form_submission__status=FormSubmission.SUBMITTED,
+                ).exclude(form_submission=instance)
+                if db_qs.exists():
+                    existing_collab = db_qs.first()
+                    proposal_identifier = getattr(existing_collab.form_submission, 'proposal_id', None) or getattr(existing_collab.form_submission, 'form_id', None) or "Unknown"
+                    raise serializers.ValidationError({
+                        "non_field_errors": [
+                            f"Collaborator with organization '{org}' already exists for village '{proposed_village}'. Proposal ID: {proposal_identifier}"
+                        ]
+                    })
+
+            for pan in pans_seen:
+                if not pan:
+                    continue
+                db_qs = Collaborator.objects.filter(
+                    pan_file_name_collab__iexact=pan,
+                    form_submission__proposed_village=proposed_village,
+                    form_submission__status=FormSubmission.SUBMITTED,
+                ).exclude(form_submission=instance)
+                if db_qs.exists():
+                    existing_collab = db_qs.first()
+                    proposal_identifier = getattr(existing_collab.form_submission, 'proposal_id', None) or getattr(existing_collab.form_submission, 'form_id', None) or "Unknown"
+                    raise serializers.ValidationError({
+                        "non_field_errors": [
+                            f"Collaborator with PAN '{pan}' already exists for village '{proposed_village}'. Proposal ID: {proposal_identifier}"
+                        ]
+                    })
+
+        if errors:
+            raise serializers.ValidationError(errors)
+        return data

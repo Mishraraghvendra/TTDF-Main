@@ -186,6 +186,24 @@ class TeamMemberSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'form_submission']
 
 
+    def validate(self, attrs):
+        # On update, don't count self
+        qs = TeamMember.objects.filter(
+            form_submission=attrs.get('form_submission'),
+            name=attrs.get('name'),
+            otherdetails=attrs.get('otherdetails')
+        )
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                {"non_field_errors": [
+                    "A team member with the same name and other Designation exists for this proposal."
+                ]}
+            )
+        return attrs     
+
+
 class ConsortiumPartnerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Collaborator
@@ -600,8 +618,6 @@ class BudgetEstimateSerializer(serializers.ModelSerializer):
         
         return data
     
-
-
 
 class FinanceDetailsSerializer(serializers.ModelSerializer):
     class Meta:

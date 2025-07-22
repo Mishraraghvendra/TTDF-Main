@@ -5,7 +5,7 @@ from dynamic_form import views as forms_views
 from django.conf import settings
 from django.conf.urls.static import static
 
-from .views import FormTemplateViewSet, FormSubmissionViewSet
+from .views import FormTemplateViewSet, FormSubmissionViewSet,ProposalVillageStatsAPIView
 
 router = DefaultRouter()
 router.register(r'templates',   FormTemplateViewSet,    basename='template')
@@ -14,8 +14,9 @@ router.register(r'submissions', FormSubmissionViewSet,  basename='submission')
 urlpatterns = [
     path('', include(router.urls)),
     path('form-sections/', include('dynamic_form.form_urls')),
-    
+    path('proposals/village-stats/', ProposalVillageStatsAPIView.as_view(), name='proposal-village-stats'),
 ]
+    
 
 # Add media file serving for development environment
 if settings.DEBUG:

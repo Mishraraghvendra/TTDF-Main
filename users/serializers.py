@@ -9,6 +9,8 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.validators import UniqueValidator
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.exceptions import ValidationError as DRFValidationError
+from django.core.validators import URLValidator
+
 
 from .models import (
     User, Profile, Role, UserRole, UserPermission,
@@ -74,6 +76,12 @@ class ProfileSerializer(serializers.ModelSerializer):
         fields = ['address','dob','additional_info','specialization']
 
 
+    def validate_website_link(self, value):
+        if value and not value.startswith(('http://', 'https://')):
+            value = 'https://' + value
+        return value       
+
+
 # Roles
 class RoleSerializer(serializers.ModelSerializer):
     permissions = serializers.ListField(
@@ -134,6 +142,7 @@ class AssignRoleSerializer(serializers.Serializer):
         user.is_auth_user = True
         user.save(update_fields=['is_auth_user'])
         return ur
+
 
 
 class AssignPermissionSerializer(serializers.Serializer):
@@ -228,6 +237,7 @@ class PasswordResetRequestSerializer(serializers.Serializer):
         if not User.objects.filter(email=email, is_active=True).exists():
             raise ValidationError("No active account with this email.")
         return email
+
 
 
 class PasswordResetConfirmSerializer(serializers.Serializer):
@@ -503,16 +513,98 @@ class InitialSignupSerializer(serializers.ModelSerializer):
         return user
 
 
-class ProfileUpdateSerializer(serializers.Serializer):
-    """Serializer for updating both User and Profile fields"""
+# class ProfileUpdateSerializer(serializers.Serializer):
+#     """Serializer for updating both User and Profile fields"""
     
+#     # User fields (can be updated)
+#     name = serializers.CharField(max_length=100, required=False, allow_blank=True)  
+#     gender = serializers.ChoiceField(choices=User.GENDER_CHOICES, required=False)
+#     mobile = serializers.CharField(max_length=15, required=False, allow_blank=True)
+#     email = serializers.EmailField(required=False, allow_blank=True)
+#     organization = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    
+#     # Profile fields (all existing fields)
+#     profile_image = serializers.ImageField(required=False)
+#     dob = serializers.DateField(required=False)
+#     additional_info = serializers.JSONField(required=False)
+#     specialization = serializers.CharField(max_length=100, required=False, allow_blank=True)
+#     qualification = serializers.CharField(max_length=255, required=False, allow_blank=True)
+#     applicant_official_email = serializers.EmailField(required=False, allow_blank=True)
+#     proposal_duration_years = serializers.IntegerField(required=False)
+#     proposal_duration_months = serializers.IntegerField(required=False)
+#     proposal_submitted_by = serializers.CharField(max_length=255, required=False, allow_blank=True)
+#     address_line_1 = serializers.CharField(max_length=255, required=False, allow_blank=True)
+#     address_line_2 = serializers.CharField(max_length=255, required=False, allow_blank=True)
+#     street_village = serializers.CharField(max_length=255, required=False, allow_blank=True)
+#     city = serializers.CharField(max_length=100, required=False, allow_blank=True)
+#     country = serializers.CharField(max_length=100, required=False, allow_blank=True)
+#     state = serializers.CharField(max_length=100, required=False, allow_blank=True)
+#     pincode = serializers.CharField(max_length=20, required=False, allow_blank=True)
+#     landline_number = serializers.CharField(max_length=20, required=False, allow_blank=True)
+#     company_mobile_no = serializers.CharField(max_length=20, required=False, allow_blank=True)
+#     # website_link = serializers.URLField(required=False, allow_blank=True)
+#     website_link = serializers.CharField(required=False, allow_blank=True)
+#     company_as_per_guidelines = serializers.CharField(max_length=255, required=False, allow_blank=True)
+#     application_submission_date = serializers.DateField(required=False)
+#     is_applied_before = serializers.BooleanField(required=False)
+#     resume = serializers.FileField(required=False)
+#     applicant_type = serializers.CharField(max_length=100, required=False, allow_blank=True)
+#     applicant_aadhar = serializers.CharField(max_length=12, required=False, allow_blank=True)
+#     applicant_passport = serializers.CharField(max_length=20, required=False, allow_blank=True)
+#     organization_registration_certificate = serializers.FileField(required=False)
+#     approval_certificate = serializers.FileField(required=False)
+#     three_years_financial_report = serializers.FileField(required=False)
+#     is_organization_domestic = serializers.BooleanField(required=False)
+#     share_holding_pattern = serializers.FileField(required=False)
+#     dsir_certificate = serializers.FileField(required=False)
+#     id_type = serializers.CharField(max_length=50, required=False, allow_blank=True)
+#     id_number = serializers.CharField(max_length=50, required=False, allow_blank=True)
+    
+#     def update(self, instance, validated_data):
+#         user = instance.user
+        
+#         # Update User fields if provided
+#         user_fields = ['name', 'gender', 'mobile', 'email', 'organization','website_link'
+# ]
+#         for field in user_fields:
+#             if field in validated_data:
+#                 value = validated_data.pop(field)
+#                 if field == 'name':
+#                     setattr(user, 'full_name', value)
+#                 else:
+#                     setattr(user, field, value)
+#         user.save()
+        
+#         # Update Profile fields
+#         for field, value in validated_data.items():
+#             setattr(instance, field, value)
+#         instance.save()
+        
+#         return instance
+    
+
+#     def validate_website_link(self, value):
+#         if value and not value.startswith(('http://', 'https://')):
+#             value = 'https://' + value
+#         # Validate final value is a URL
+#         from django.core.validators import URLValidator
+#         from django.core.exceptions import ValidationError as DjangoValidationError
+#         validator = URLValidator()
+#         try:
+#             validator(value)
+#         except DjangoValidationError:
+#             raise serializers.ValidationError("Enter a valid URL.")
+#         return value  
+
+
+class ProfileUpdateSerializer(serializers.Serializer):
     # User fields (can be updated)
     name = serializers.CharField(max_length=100, required=False, allow_blank=True)
     gender = serializers.ChoiceField(choices=User.GENDER_CHOICES, required=False)
     mobile = serializers.CharField(max_length=15, required=False, allow_blank=True)
     email = serializers.EmailField(required=False, allow_blank=True)
     organization = serializers.CharField(max_length=100, required=False, allow_blank=True)
-    
+
     # Profile fields (all existing fields)
     profile_image = serializers.ImageField(required=False)
     dob = serializers.DateField(required=False)
@@ -532,7 +624,7 @@ class ProfileUpdateSerializer(serializers.Serializer):
     pincode = serializers.CharField(max_length=20, required=False, allow_blank=True)
     landline_number = serializers.CharField(max_length=20, required=False, allow_blank=True)
     company_mobile_no = serializers.CharField(max_length=20, required=False, allow_blank=True)
-    website_link = serializers.URLField(required=False, allow_blank=True)
+    website_link = serializers.CharField(required=False, allow_blank=True)  # <-- Use CharField!
     company_as_per_guidelines = serializers.CharField(max_length=255, required=False, allow_blank=True)
     application_submission_date = serializers.DateField(required=False)
     is_applied_before = serializers.BooleanField(required=False)
@@ -548,10 +640,21 @@ class ProfileUpdateSerializer(serializers.Serializer):
     dsir_certificate = serializers.FileField(required=False)
     id_type = serializers.CharField(max_length=50, required=False, allow_blank=True)
     id_number = serializers.CharField(max_length=50, required=False, allow_blank=True)
-    
+
+    def validate_website_link(self, value):
+        if value and not value.startswith(('http://', 'https://')):
+            value = 'https://' + value
+        if value:
+            validator = URLValidator()
+            try:
+                validator(value)
+            except DjangoValidationError:
+                raise serializers.ValidationError("Enter a valid URL.")
+        return value
+
     def update(self, instance, validated_data):
         user = instance.user
-        
+
         # Update User fields if provided
         user_fields = ['name', 'gender', 'mobile', 'email', 'organization']
         for field in user_fields:
@@ -562,13 +665,14 @@ class ProfileUpdateSerializer(serializers.Serializer):
                 else:
                     setattr(user, field, value)
         user.save()
-        
+
         # Update Profile fields
         for field, value in validated_data.items():
             setattr(instance, field, value)
         instance.save()
-        
         return instance
+
+
 
 
 class ProfileGetSerializer(serializers.ModelSerializer):
@@ -598,3 +702,22 @@ class ProfileGetSerializer(serializers.ModelSerializer):
             'is_organization_domestic', 'share_holding_pattern', 'dsir_certificate',
             'id_type', 'id_number','individualPAN', 'individualPanAttachment','tan_pan_cin'
         ]
+
+    def validate_website_link(self, value):
+        if value and not value.startswith(('http://', 'https://')):
+            value = 'https://' + value
+        return value    
+
+
+
+
+class SimpleUserSerializer(serializers.ModelSerializer):
+    role = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ('id', 'full_name', 'email', 'role')  # <-- Only these fields are returned
+
+    def get_role(self, obj):
+        roles = obj.roles.all()
+        return [r.name for r in roles] if roles else []

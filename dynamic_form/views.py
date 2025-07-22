@@ -435,3 +435,61 @@ class FormSubmissionViewSet(viewsets.ModelViewSet):
                 {"success": True, "data": data_with_pk},
                 status=status.HTTP_200_OK
             )
+
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from collections import defaultdict
+from .models import FormSubmission
+
+class ProposalVillageStatsAPIView(APIView):
+    """
+    API to get:
+        - total_proposals
+        - per_village stats (village code, label, count, proposals with id/service/template)
+    """
+    def get(self, request):
+        # Only proposals where proposed_village is set
+        queryset = (
+            FormSubmission.objects
+            .filter(is_active=True)
+            .exclude(status=FormSubmission.DRAFT)
+            .exclude(proposed_village__isnull=True)
+            .exclude(proposed_village__exact="")
+        )
+
+        total_proposals = queryset.count()
+
+        # Get the display names for village choices
+        village_field = FormSubmission._meta.get_field('proposed_village')
+        village_map = dict(village_field.choices)
+
+        # Collect proposals per village code
+        per_village_data = defaultdict(list)
+        for proposal in queryset:
+            per_village_data[proposal.proposed_village].append(proposal)
+
+        results = []
+        for village_code, proposals in per_village_data.items():
+            display_name = village_map.get(village_code, village_code) or "Unknown"
+            results.append({
+                "village": village_code,
+                "village_display": display_name,
+                "count": len(proposals),
+                "proposals": [
+                    {
+                        "proposal_id": p.proposal_id,
+                        "service_name": getattr(p.service, "name", ""),
+                        "template_title": getattr(p.template, "title", ""),
+                        "status": p.status,
+                    } for p in proposals
+                ]
+            })
+
+        results = sorted(results, key=lambda x: x['village_display'] or "")
+
+        return Response({
+            "total_proposals": total_proposals,
+            "per_village": results,
+        })

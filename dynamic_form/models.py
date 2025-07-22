@@ -5,6 +5,7 @@ from datetime import datetime
 from django.conf import settings
 from .utils.pdf_generator import generate_submission_pdf
 from functools import partial
+from django.utils import timezone
 
 YES_NO_CHOICES = [
     ('yes','Yes'),
@@ -53,11 +54,12 @@ class FormTemplate(models.Model):
 #     return f"{folder}/{service_name}/{filename}"
 
 def upload_to_dynamic(instance, filename, subfolder=None):
-    service = getattr(instance, 'service', None)
-    if not service and hasattr(instance, 'form_submission'):
-        service = getattr(instance.form_submission, 'service', None)
-    service_name = getattr(service, 'name', 'unknown') if service else "unknown"
-    service_name = service_name.replace(" ", "_").lower()
+    # Try to get template from instance or form_submission
+    template = getattr(instance, 'template', None)
+    if not template and hasattr(instance, 'form_submission'):
+        template = getattr(instance.form_submission, 'template', None)
+    template_name = getattr(template, 'title', 'unknown') if template else "unknown"
+    template_name = template_name.replace(" ", "_").lower()
     folder = subfolder or "docs"
     # Get proposal_id
     proposal_id = getattr(instance, 'proposal_id', None)
@@ -65,30 +67,30 @@ def upload_to_dynamic(instance, filename, subfolder=None):
         proposal_id = getattr(instance.form_submission, 'proposal_id', None)
     if not proposal_id:
         proposal_id = "draft"
-    return f"services/{service_name}/{proposal_id}/{folder}/{filename}"
+    return f"templates/{template_name}/{proposal_id}/{folder}/{filename}"
 
 
 
 import os
 from django.core.files.base import File
 
-def move_file_to_proposal_folder(file_field, instance, old_path, new_path):
-    """
-    Move a file from old_path to new_path using Django's storage system,
-    then update the file_field on the instance.
-    """
-    if not file_field or not old_path or not new_path or old_path == new_path:
-        return False
-    storage = file_field.storage
-    if not storage.exists(old_path):
-        return False
-    # Read file content
-    with storage.open(old_path, 'rb') as f:
-        content = File(f)
-        storage.save(new_path, content)
-    storage.delete(old_path)
-    file_field.name = new_path  # update field value (unsaved)
-    return True
+# def move_file_to_proposal_folder(file_field, instance, old_path, new_path):
+#     """
+#     Move a file from old_path to new_path using Django's storage system,
+#     then update the file_field on the instance.
+#     """
+#     if not file_field or not old_path or not new_path or old_path == new_path:
+#         return False
+#     storage = file_field.storage
+#     if not storage.exists(old_path):
+#         return False
+#     # Read file content
+#     with storage.open(old_path, 'rb') as f:
+#         content = File(f)
+#         storage.save(new_path, content)
+#     storage.delete(old_path)
+#     file_field.name = new_path  # update field value (unsaved)
+#     return True
 
 
 class FormSubmission(models.Model):
@@ -146,6 +148,17 @@ class FormSubmission(models.Model):
     created_at   = models.DateTimeField(auto_now_add=True)
     updated_at   = models.DateTimeField(auto_now=True)
     committee_assigned = models.BooleanField(default=False)
+
+
+     # ---9. Summary Section ---
+    funds_requested= models.PositiveIntegerField(null=True,blank=True) 
+    grant_from_ttdf = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
+    contribution_applicant = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
+    expected_other_contribution = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
+    other_source_funding = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
+    total_project_cost = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
+    actual_contribution_applicant = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
+
     
 
     # ——— 1. Basic Information ——————————————————
@@ -167,36 +180,6 @@ class FormSubmission(models.Model):
     # --- Other Section ---
     ttdf_applied_before = models.CharField(max_length=3, choices=YES_NO_CHOICES, blank=True, null=True)
 
-
-    # --- 4 Equipment Section ---
-    # equipment_item = models.CharField(max_length=255, blank=True, null=True)
-    # equipment_unit_price = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
-    # equipment_quantity = models.PositiveIntegerField(blank=True, null=True)
-    # equipment_amount = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
-    # equipment_contributor_type = models.CharField(max_length=255, blank=True, null=True)
-
-    # --- 5.Share Holder Details ---
-    # share_holder_name = models.CharField(max_length=255, blank=True, null=True)
-    # share_percentage = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
-    # identity_document = models.FileField(
-    #     upload_to=partial(upload_to_dynamic, subfolder="shareholder_docs"),
-    #     blank=True,
-    #     null=True
-    # )
-
-
-    # # ——— 6. RD Staff & Equipment (variable rows) ——    
-    # rd_staff_name = models.CharField(max_length=255, blank=True, null=True)
-    # rd_staff_designation = models.CharField(max_length=255, blank=True, null=True)
-    # rd_staff_email = models.EmailField(blank=True, null=True)
-    # rd_staff_highest_qualification = models.CharField(max_length=255, blank=True, null=True)
-    # rd_staff_mobile = models.CharField(max_length=20, blank=True, null=True)
-    # rd_staff_resume = models.FileField(
-    #     upload_to=partial(upload_to_dynamic, subfolder="rd_staff_resumes"),
-    #     blank=True,
-    #     null=True
-    # )
-    # rd_staff_epf_details = models.CharField(max_length=255, blank=True, null=True)
 
 
     # ---7. Fund loan Details Section ---
@@ -221,15 +204,7 @@ class FormSubmission(models.Model):
     contribution_rows = models.JSONField(blank=True, null=True, default=list, help_text="Array of contribution entries")
     fund_rows = models.JSONField(blank=True, null=True, default=list, help_text="Array of fund entries")
 
-    # ---9. Summary Section ---
-    funds_requested= models.PositiveIntegerField(null=True,blank=True) 
-    grant_from_ttdf = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
-    contribution_applicant = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
-    expected_other_contribution = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
-    other_source_funding = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
-    total_project_cost = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
-    actual_contribution_applicant = models.DecimalField(max_digits=15, decimal_places=5, blank=True, null=True)
-
+   
 
     # ---10 Key Information Section ---
     proposal_brief = models.TextField(blank=True, null=True)
@@ -686,7 +661,7 @@ class FormSubmission(models.Model):
 
         # ---- 2. If just submitted, move files out of /draft/ to final location ----
         if self.status == self.SUBMITTED and (is_new_submission or was_draft):
-            self.move_all_files_to_proposal_folder()
+            # self.move_all_files_to_proposal_folder()
             # Save again to update file fields with new paths
             super().save(update_fields=[f.name for f in self._meta.fields if isinstance(f, models.FileField)])
 
@@ -697,59 +672,79 @@ class FormSubmission(models.Model):
 
 
 
-    def move_all_files_to_proposal_folder(self):
-        file_fields = [
-            'pan_file', 'passport_file', 'resume_upload', 'gantt_chart', 'technical_proposal',
-            'proposal_presentation', 'budget_estimate_sample_doc', 'equipment_overhead_sample_doc',
-            'income_estimate_sample_doc', 'presentation', 'dpr', 'applicationDocument'
-        ]
-        for field in file_fields:
-            file = getattr(self, field, None)
-            if file and file.name and '/draft/' in file.name:
-                new_path = file.name.replace('/draft/', f'/{self.proposal_id}/')
-                move_file_to_proposal_folder(file, self, file.name, new_path)
-                setattr(self, field, new_path)
+    # def move_all_files_to_proposal_folder(self):
+    #     file_fields = [
+    #         'pan_file', 'passport_file', 'resume_upload', 'gantt_chart', 'technical_proposal',
+    #         'proposal_presentation', 'budget_estimate_sample_doc', 'equipment_overhead_sample_doc',
+    #         'income_estimate_sample_doc', 'presentation', 'dpr', 'applicationDocument'
+    #     ]
+    #     for field in file_fields:
+    #         file = getattr(self, field, None)
+    #         if file and file.name and '/draft/' in file.name:
+    #             new_path = file.name.replace('/draft/', f'/{self.proposal_id}/')
+    #             move_file_to_proposal_folder(file, self, file.name, new_path)
+    #             setattr(self, field, new_path)
 
-        relateds = [
-            (self.fund_loan_documents.all(), ['document']),
-            (self.iprdetails.all(), ['t_support_letter']),
-            (self.collaborators.all(), ['pan_file_collab', 'mou_file_collab']),
-            (self.rdstaff.all(), ['rd_staf_resume']),
-            (self.shareholders.all(), ['identity_document']),
-            (self.sub_shareholders.all(), ['identity_document']),
-        ]
-        for queryset, fields in relateds:
-            for obj in queryset:
-                for field in fields:
-                    file = getattr(obj, field, None)
-                    if file and file.name and '/draft/' in file.name:
-                        new_path = file.name.replace('/draft/', f'/{self.proposal_id}/')
-                        move_file_to_proposal_folder(file, obj, file.name, new_path)
-                        setattr(obj, field, new_path)
-                        obj.save(update_fields=[field])
+    #     relateds = [
+    #         (self.fund_loan_documents.all(), ['document']),
+    #         (self.iprdetails.all(), ['t_support_letter']),
+    #         (self.collaborators.all(), ['pan_file_collab', 'mou_file_collab']),
+    #         (self.rdstaff.all(), ['rd_staf_resume']),
+    #         (self.shareholders.all(), ['identity_document']),
+    #         (self.sub_shareholders.all(), ['identity_document']),
+    #     ]
+    #     for queryset, fields in relateds:
+    #         for obj in queryset:
+    #             for field in fields:
+    #                 file = getattr(obj, field, None)
+    #                 if file and file.name and '/draft/' in file.name:
+    #                     new_path = file.name.replace('/draft/', f'/{self.proposal_id}/')
+    #                     move_file_to_proposal_folder(file, obj, file.name, new_path)
+    #                     setattr(obj, field, new_path)
+    #                     obj.save(update_fields=[field])
 
-    # The file moving helper
-    def move_file_to_proposal_folder(file_field, instance, old_path, new_path):
-        storage = file_field.storage
-        if not storage.exists(old_path) or old_path == new_path:
-            return False
-        from django.core.files.base import File
-        with storage.open(old_path, 'rb') as f:
-            content = File(f)
-            storage.save(new_path, content)
-        storage.delete(old_path)
-        file_field.name = new_path
-        return True
+    # # The file moving helper
+    # def move_file_to_proposal_folder(file_field, instance, old_path, new_path):
+    #     storage = file_field.storage
+    #     if not storage.exists(old_path) or old_path == new_path:
+    #         return False
+    #     from django.core.files.base import File
+    #     with storage.open(old_path, 'rb') as f:
+    #         content = File(f)
+    #         storage.save(new_path, content)
+    #     storage.delete(old_path)
+    #     file_field.name = new_path
+    #     return True
 
+
+
+    # def can_edit(self):
+    #     now = datetime.now()
+    #     if self.status == self.DRAFT:
+    #         return True
+    #     if self.status == self.SUBMITTED and self.updated_at < self.template.end_date:
+    #         return True
+    #     return False
 
 
     def can_edit(self):
-        now = datetime.now()
+        now = timezone.now()  # Use Django's timezone-aware now
+        # Allow edits if still draft
         if self.status == self.DRAFT:
             return True
-        if self.status == self.SUBMITTED and self.updated_at < self.template.end_date:
-            return True
+
+        # Allow edits if submitted, only if dates are present and updated_at is before template.end_date
+        if (
+            self.status == self.SUBMITTED
+            and self.updated_at is not None
+            and self.template is not None
+            and getattr(self.template, 'end_date', None) is not None
+        ):
+            return self.updated_at < self.template.end_date
+
+        # Default: not editable
         return False
+
 
     def __str__(self):
         return f"{self.form_id} ({self.get_status_display()})"
@@ -873,6 +868,9 @@ class TeamMember(models.Model):
     resumetext = models.TextField(blank=True, null=True)
     otherdetails = models.TextField(blank=True, null=True)
 
+    class Meta:
+        unique_together = ('form_submission', 'name', 'otherdetails') 
+
 
 
 
@@ -889,7 +887,7 @@ class FormPage(models.Model):
         
     def __str__(self):
         return f"{self.form_template.title} - {self.title}"
-
+   
 class FormField(models.Model):
     FIELD_TYPES = (
         ('text', 'Text'),

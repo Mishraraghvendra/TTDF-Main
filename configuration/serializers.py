@@ -9,7 +9,7 @@ from .models import ScreeningCommittee, CommitteeMember, ScreeningResult,Criteri
 from dynamic_form.models import FormTemplate, FormField
 from app_eval.models import CriteriaType
 from dynamic_form.serializers import FormTemplateSerializer
-
+from users.models import User  # or your correct path
 User = get_user_model()
 
 class UserSerializer(serializers.ModelSerializer):
@@ -407,7 +407,7 @@ class UserBasicSerializer(serializers.ModelSerializer):
         return getattr(obj, 'evaluator', None) and obj.evaluator.department
 
     def get_role(self, obj):
-        ur = obj.userrole_set.first()
+        ur = obj.user_roles.first() 
         return ur.role.name if ur else None
 
 
@@ -441,30 +441,116 @@ class CommitteeMemberSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
-# from .serializers import UserBasicSerializer  # Assuming this is already defined
+
+# class ScreeningCommitteeSerializer(serializers.ModelSerializer):
+#     members_count = serializers.SerializerMethodField()
+#     head_details = UserBasicSerializer(source='head', read_only=True)
+#     sub_head_details = UserBasicSerializer(source='sub_head', read_only=True)
+
+#     class Meta:
+#         model = ScreeningCommittee
+#         fields = [
+#             'id', 'service', 'name', 'committee_type', 'description',
+#             'head', 'head_details', 'sub_head', 'sub_head_details',
+#             'is_active', 'created_at', 'members_count', 'is_created','members', 
+#         ]
+#         read_only_fields = ['created_at', 'is_created', 'members_count', 'head_details', 'sub_head_details']
+
+#     def get_members_count(self, obj):
+#         return obj.members.filter(is_active=True).count()
+
+#     # def create(self, validated_data):
+#     #     request = self.context.get('request')
+#     #     if request and hasattr(request, 'user'):
+#     #         validated_data['created_by'] = request.user
+#     #     return super().create(validated_data)
+
+
+#     def create(self, validated_data):
+#         members = validated_data.pop('members', [])
+#         request = self.context.get('request')
+#         if request and hasattr(request, 'user'):
+#             validated_data['created_by'] = request.user
+#         committee = super().create(validated_data)
+#         # Save committee members
+        
+#         for user_id in members:
+#             user = User.objects.get(pk=user_id)
+#             CommitteeMember.objects.create(
+#                 committee=committee,
+#                 user=user,
+#                 assigned_by=request.user if request else None,
+#                 is_active=True
+#             )
+#         return committee
 
 class ScreeningCommitteeSerializer(serializers.ModelSerializer):
+    members = serializers.ListField(
+        child=serializers.CharField(),  # or IntegerField/UUIDField as per your User PK type!
+        write_only=True, required=False
+    )
     members_count = serializers.SerializerMethodField()
     head_details = UserBasicSerializer(source='head', read_only=True)
     sub_head_details = UserBasicSerializer(source='sub_head', read_only=True)
+    members_details = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = ScreeningCommittee
         fields = [
             'id', 'service', 'name', 'committee_type', 'description',
             'head', 'head_details', 'sub_head', 'sub_head_details',
-            'is_active', 'created_at', 'members_count', 'is_created'
+            'is_active', 'created_at', 'members_count', 'is_created', 'members','members_details'
         ]
-        read_only_fields = ['created_at', 'is_created']
+        read_only_fields = [
+            'created_at', 'is_created', 'members_count', 'head_details', 'sub_head_details'
+        ]
 
     def get_members_count(self, obj):
         return obj.members.filter(is_active=True).count()
+    
+
+    def get_members_details(self, obj):
+        members = obj.members.filter(is_active=True).select_related('user')
+        return [
+            {
+                "id": m.user.id,
+                "name": (
+                    m.user.get_full_name() if hasattr(m.user, "get_full_name") else
+                    getattr(m.user, "full_name", None) or
+                    m.user.email
+                ),
+                "email": m.user.email
+            }
+            for m in members
+        ]
+
+
+
 
     def create(self, validated_data):
+        members = validated_data.pop('members', [])
         request = self.context.get('request')
         if request and hasattr(request, 'user'):
             validated_data['created_by'] = request.user
-        return super().create(validated_data)
+        committee = super().create(validated_data)
+        # Save committee members
+        from django.core.exceptions import ObjectDoesNotExist
+        errors = []
+        for user_id in members:
+            try:
+                user = User.objects.get(pk=user_id)
+                CommitteeMember.objects.create(
+                    committee=committee,
+                    user=user,
+                    assigned_by=request.user if request else None,
+                    is_active=True
+                )
+            except ObjectDoesNotExist:
+                errors.append(f'Invalid pk "{user_id}" - object does not exist.')
+        if errors:
+            raise serializers.ValidationError({'members': errors})
+        return committee
+
 
 
 class ScreeningResultSerializer(serializers.ModelSerializer):
